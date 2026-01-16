@@ -80,9 +80,9 @@ export default function Dashboard() {
             <h3 className="text-white font-bold text-sm">Critical Flag: Cardiology</h3>
             <p className="text-gray-400 text-xs">You missed 3 questions on ACS protocols.</p>
           </div>
-          <button className="ml-auto text-xs bg-red-500 text-white px-3 py-1.5 rounded font-bold">
+          <Link href="/station" className="ml-auto text-xs bg-red-500 text-white px-3 py-1.5 rounded font-bold">
             FIX
-          </button>
+          </Link>
         </motion.div>
 
       </main>
