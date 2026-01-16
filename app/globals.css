@@ -16,4 +16,19 @@ body {
       rgb(var(--background-end-rgb))
     )
     rgb(var(--background-start-rgb));
+  /* Prevent bouncing on Mac/iOS */
+  overscroll-behavior: none; 
+}
+
+/* --- THE APP FEEL --- */
+/* Hide scrollbars for Chrome, Safari and Opera */
+::-webkit-scrollbar {
+  width: 0px;
+  background: transparent;
+}
+
+/* Hide scrollbar for IE, Edge and Firefox */
+html {
+  -ms-overflow-style: none;  /* IE and Edge */
+  scrollbar-width: none;  /* Firefox */
 }
