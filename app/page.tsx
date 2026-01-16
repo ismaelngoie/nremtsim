@@ -86,24 +86,24 @@ export default function Home() {
             </button>
           ) : (
             <div className="grid grid-cols-2 gap-4">
-              {/* EMT BUTTON */}
+              {/* EMT BUTTON (BLS) */}
               <button 
                 onClick={() => selectLevel("EMT")}
                 className="group relative p-6 bg-blue-600/10 border border-blue-500/50 hover:bg-blue-600 hover:border-blue-500 rounded-xl transition-all duration-200"
               >
                 <div className="text-3xl mb-2">🚑</div>
                 <div className="text-white font-black text-xl">EMT</div>
-                <div className="text-blue-200 text-xs font-bold tracking-widest mt-1 group-hover:text-white">ALS (EMT/EMR)</div>
+                <div className="text-blue-200 text-xs font-bold tracking-widest mt-1 group-hover:text-white">BLS (EMT/EMR)</div>
               </button>
 
-              {/* PARAMEDIC BUTTON */}
+              {/* PARAMEDIC BUTTON (ALS) */}
               <button 
                 onClick={() => selectLevel("Paramedic")}
                 className="group relative p-6 bg-red-600/10 border border-red-500/50 hover:bg-red-600 hover:border-red-500 rounded-xl transition-all duration-200"
               >
                 <div className="text-3xl mb-2">⚡️</div>
                 <div className="text-white font-black text-xl">PARAMEDIC</div>
-                <div className="text-red-200 text-xs font-bold tracking-widest mt-1 group-hover:text-white">BLS (Paramedic/AEMT)</div>
+                <div className="text-red-200 text-xs font-bold tracking-widest mt-1 group-hover:text-white">ALS (Paramedic/AEMT)</div>
               </button>
             </div>
           )}
