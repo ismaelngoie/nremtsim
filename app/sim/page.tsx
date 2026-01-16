@@ -66,9 +66,9 @@ export default function SimulatorPage() {
             </div>
           </div>
 
-          <button className="w-full py-4 bg-white text-black font-bold rounded-lg hover:bg-gray-200 transition-colors">
+          <a href="/pay" className="block w-full py-4 bg-white text-black font-bold rounded-lg hover:bg-gray-200 transition-colors">
             UNLOCK FULL REPORT
-          </button>
+          </a>
         </motion.div>
       </div>
     );
