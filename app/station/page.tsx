@@ -19,7 +19,6 @@ export default function StationPage() {
   const [isFinished, setIsFinished] = useState(false);
 
   // Load current question safely
-  // We use modulo (%) so if we run out of unique questions, it loops instead of crashing
   const question = questions[currentIndex % questions.length];
 
   // --- TIMER LOGIC ---
@@ -50,11 +49,10 @@ export default function StationPage() {
         return;
       }
       
-      if (e.key === "1") setSelected(0);
-      if (e.key === "2") setSelected(1);
-      if (e.key === "3") setSelected(2);
-      if (e.key === "4") setSelected(3);
-      if (e.key === "Enter" && selected !== null) handleSubmit();
+      if (e.key === "1") handleOptionSelect(0);
+      if (e.key === "2") handleOptionSelect(1);
+      if (e.key === "3") handleOptionSelect(2);
+      if (e.key === "4") handleOptionSelect(3);
     };
 
     window.addEventListener("keydown", handleKeyDown);
@@ -62,9 +60,15 @@ export default function StationPage() {
   }, [selected, submitted, isFinished]);
 
   // --- HANDLERS ---
-  const handleSubmit = () => {
+  const handleOptionSelect = (idx: number) => {
+      if (submitted) return;
+      setSelected(idx);
+      handleSubmit(idx); // Auto-submit on selection for immediate feedback
+  };
+
+  const handleSubmit = (idx: number) => {
     setSubmitted(true);
-    if (selected === question.correctIndex) {
+    if (idx === question.correctIndex) {
       setStreak((s) => s + 1);
       setScore((s) => s + 1);
     } else {
@@ -96,7 +100,7 @@ export default function StationPage() {
     const passed = percentage >= 70;
 
     return (
-      <div className="min-h-screen bg-[#0F172A] flex items-center justify-center p-6">
+      <div className="min-h-screen bg-[#0F172A] flex items-center justify-center p-6 text-white font-sans">
         <div className="max-w-md w-full bg-slate-900 border border-white/10 rounded-2xl p-8 text-center shadow-2xl">
           <div className="mb-6 flex justify-center">
             <div className={`w-20 h-20 rounded-full flex items-center justify-center ${passed ? "bg-green-500/20" : "bg-red-500/20"}`}>
@@ -134,7 +138,7 @@ export default function StationPage() {
     );
   }
 
-  // --- VIEW: ACTIVE SIMULATOR ---
+  // --- VIEW: ACTIVE STATION MODE ---
   return (
     <div className="min-h-screen bg-[#0F172A] text-white font-sans flex flex-col">
       
@@ -214,7 +218,7 @@ export default function StationPage() {
                 return (
                   <button
                     key={idx}
-                    onClick={() => !submitted && setSelected(idx)}
+                    onClick={() => handleOptionSelect(idx)}
                     className={`relative p-5 rounded-xl border-2 text-left transition-all duration-200 group ${borderColor} ${bgColor}`}
                   >
                     <div className="flex items-start gap-4">
@@ -233,7 +237,7 @@ export default function StationPage() {
         </AnimatePresence>
       </main>
 
-      {/* FEEDBACK DRAWER */}
+      {/* IMMEDIATE FEEDBACK DRAWER (Popup) */}
       <AnimatePresence>
         {submitted && (
           <motion.div
@@ -248,7 +252,6 @@ export default function StationPage() {
               <div className="flex-1">
                 <div className="flex items-center gap-3 mb-2">
                   <div className={`w-8 h-8 rounded-full flex items-center justify-center ${selected === question.correctIndex ? "bg-green-500" : "bg-red-500"}`}>
-                    {/* Icon SVG */}
                     {selected === question.correctIndex ? (
                        <svg className="w-5 h-5 text-black" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="3"><path d="M5 13l4 4L19 7" /></svg>
                     ) : (
@@ -256,7 +259,7 @@ export default function StationPage() {
                     )}
                   </div>
                   <h3 className={`font-bold text-lg ${selected === question.correctIndex ? "text-green-400" : "text-red-400"}`}>
-                    {selected === question.correctIndex ? "Correct" : "Incorrect"}
+                    {selected === question.correctIndex ? "Correct!" : "Incorrect"}
                   </h3>
                 </div>
                 <p className="text-gray-400 text-sm leading-relaxed">
