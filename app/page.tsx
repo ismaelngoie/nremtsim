@@ -94,7 +94,7 @@ export default function Home() {
               >
                 <div className="text-3xl mb-2">🚑</div>
                 <div className="text-white font-black text-xl">EMT</div>
-                <div className="text-blue-200 text-xs font-bold tracking-widest mt-1 group-hover:text-white">BASIC</div>
+                <div className="text-blue-200 text-xs font-bold tracking-widest mt-1 group-hover:text-white">BLS (EMT/EMR)</div>
               </button>
 
               {/* PARAMEDIC BUTTON */}
@@ -104,7 +104,7 @@ export default function Home() {
               >
                 <div className="text-3xl mb-2">⚡️</div>
                 <div className="text-white font-black text-xl">PARAMEDIC</div>
-                <div className="text-red-200 text-xs font-bold tracking-widest mt-1 group-hover:text-white">ALS / NRP</div>
+                <div className="text-red-200 text-xs font-bold tracking-widest mt-1 group-hover:text-white">ALS (Paramedic/AEMT)</div>
               </button>
             </div>
           )}
