@@ -2,23 +2,19 @@
 
 import { motion } from "framer-motion";
 import { useState } from "react";
-import { questions } from "@/lib/questions"; // Importing your data!
+import { useRouter } from "next/navigation"; // Added this for navigation
 
 export default function Home() {
   const [clicked, setClicked] = useState(false);
+  const router = useRouter(); // Initialize the router
 
-  // This function simulates the "Glitch" loading
   const handleStart = () => {
     setClicked(true);
     
-    // In a later step, we will make this redirect to the actual Quiz Page.
-    // For now, we just show that we found the questions.
-    console.log(`Loaded ${questions.length} questions from the Brain.`);
-    
+    // Fake loading delay for drama
     setTimeout(() => {
-      alert("Simulation Initialized. Loaded " + questions.length + " Protocols.");
-      setClicked(false);
-    }, 2000);
+      router.push('/sim'); // Go to the Simulator Page
+    }, 1500);
   };
 
   return (
@@ -63,7 +59,7 @@ export default function Home() {
           transition={{ delay: 0.6 }}
           className="text-gray-400 max-w-md text-sm md:text-base font-mono"
         >
-          {questions.length} Clinical Scenarios Loaded. The adaptive algorithm determines competency.
+          The adaptive algorithm determines competency between 70 and 120 questions. Test your logic now.
         </motion.p>
 
         <motion.div
@@ -82,6 +78,15 @@ export default function Home() {
             </span>
           </button>
         </motion.div>
+
+        <motion.p 
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 1.5 }}
+          className="text-white/20 text-[10px] uppercase tracking-widest mt-8"
+        >
+          No Account Required • 60 Seconds
+        </motion.p>
 
       </div>
     </main>
