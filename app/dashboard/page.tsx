@@ -3,6 +3,7 @@
 import Dock from "@/components/Dock";
 import BodyHeatmap from "@/components/BodyHeatmap";
 import { motion } from "framer-motion";
+import Link from "next/link";
 
 export default function Dashboard() {
   return (
