@@ -60,10 +60,10 @@ export default function Dashboard() {
             ))}
           </div>
           
-          <button className="w-full py-3 bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg text-sm font-bold transition-all flex items-center justify-center gap-2">
+          <Link href="/station" className="w-full py-3 bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg text-sm font-bold transition-all flex items-center justify-center gap-2">
             <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
             BEGIN 15-MIN DRILL
-          </button>
+          </Link>
         </motion.div>
 
         {/* C. Critical Weakness Alert */}
