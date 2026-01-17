@@ -23,19 +23,20 @@ const fmt = (n: number) => `$${n}`;
 export default function PaywallPage() {
   const [selectedPlan, setSelectedPlan] = useState<PlanKey>("annual");
 
-  // Personalization (defaults are safe fallbacks)
-  const [userLevel, setUserLevel] = useState("EMT");
+  // Personalization (safe defaults)
+  const [userLevel, setUserLevel] = useState<"EMT" | "Paramedic">("EMT");
   const [userName, setUserName] = useState("FUTURE MEDIC");
   const [readiness, setReadiness] = useState(68);
-  const [weakDomain, setWeakDomain] = useState("Cardiology");
+  const [weakDomain, setWeakDomain] = useState("Cardiac");
   const [weakPct, setWeakPct] = useState(42);
   const [daysToExam, setDaysToExam] = useState(14);
 
   useEffect(() => {
-    setUserLevel(localStorage.getItem("userLevel") || "EMT");
+    const lvl = localStorage.getItem("userLevel");
+    setUserLevel(lvl === "Paramedic" ? "Paramedic" : "EMT");
+
     setUserName(localStorage.getItem("userName") || "FUTURE MEDIC");
 
-    // If you store these after a sim, this will auto-personalize the paywall
     const rs = Number(localStorage.getItem("readinessScore"));
     const wd = localStorage.getItem("weakestDomain");
     const wp = Number(localStorage.getItem("weakestDomainPct"));
@@ -48,10 +49,33 @@ export default function PaywallPage() {
   }, []);
 
   const status = useMemo(() => {
-    if (readiness >= 80) return { label: "ON TRACK", tone: "text-emerald-400" };
-    if (readiness >= 65) return { label: "BORDERLINE", tone: "text-yellow-400" };
-    return { label: "AT RISK", tone: "text-red-400" };
+    if (readiness >= 80) return { label: "ON TRACK", tone: "text-emerald-300" };
+    if (readiness >= 65) return { label: "BORDERLINE", tone: "text-yellow-300" };
+    return { label: "AT RISK", tone: "text-red-300" };
   }, [readiness]);
+
+  const theme = useMemo(() => {
+    const isP = userLevel === "Paramedic";
+    return {
+      isP,
+      // Accent tokens
+      accentText: isP ? "text-rose-300" : "text-cyan-300",
+      accentTextStrong: isP ? "text-rose-200" : "text-cyan-200",
+      accentBorder: isP ? "border-rose-400/60" : "border-cyan-400/70",
+      accentBg: isP ? "bg-rose-500/10" : "bg-cyan-500/10",
+      accentGlow: isP
+        ? "shadow-[0_0_35px_-14px_rgba(244,63,94,0.55)]"
+        : "shadow-[0_0_35px_-14px_rgba(34,211,238,0.55)]",
+      badgeGradient: isP ? "from-rose-500 to-red-600" : "from-cyan-400 to-blue-500",
+      ctaGradient: isP ? "from-rose-600 to-red-500" : "from-blue-600 to-cyan-500",
+      idTopBorder: isP ? "border-rose-500" : "border-cyan-500",
+      bg: isP ? "#0B1226" : "#0F172A",
+      // Background glows
+      glow1: isP ? "bg-rose-500/10" : "bg-cyan-500/10",
+      glow2: isP ? "bg-red-600/10" : "bg-blue-600/10",
+      glow3: isP ? "bg-rose-600/10" : "bg-red-600/10",
+    };
+  }, [userLevel]);
 
   const dateString = useMemo(() => {
     const validDate = new Date();
@@ -64,16 +88,26 @@ export default function PaywallPage() {
     return Math.round(perMonth * 100) / 100;
   }, []);
 
-  // IMPORTANT: carry the plan so your checkout knows what to charge
+  // IMPORTANT: carry selected plan to whatever route actually handles checkout
+  // Swap /dashboard for your real checkout route if needed.
   const checkoutHref = `/dashboard?plan=${selectedPlan}`;
 
   return (
-    <div className="min-h-screen bg-[#0F172A] text-white font-sans flex flex-col items-center px-4 md:px-6 relative overflow-y-auto">
+    <div
+      className="min-h-screen text-white font-sans flex flex-col items-center px-4 md:px-6 relative overflow-y-auto"
+      style={{ backgroundColor: theme.bg }}
+    >
       {/* Background glows */}
       <div className="absolute inset-0 overflow-hidden z-0 pointer-events-none">
-        <div className="absolute -top-24 left-1/2 -translate-x-1/2 w-[680px] h-[680px] bg-cyan-500/10 blur-[130px] rounded-full" />
-        <div className="absolute top-[30%] -left-40 w-[520px] h-[520px] bg-blue-600/10 blur-[130px] rounded-full" />
-        <div className="absolute bottom-[-18%] right-[-18%] w-[620px] h-[620px] bg-red-600/10 blur-[140px] rounded-full" />
+        <div
+          className={`absolute -top-24 left-1/2 -translate-x-1/2 w-[680px] h-[680px] ${theme.glow1} blur-[130px] rounded-full`}
+        />
+        <div
+          className={`absolute top-[30%] -left-40 w-[520px] h-[520px] ${theme.glow2} blur-[130px] rounded-full`}
+        />
+        <div
+          className={`absolute bottom-[-18%] right-[-18%] w-[620px] h-[620px] ${theme.glow3} blur-[140px] rounded-full`}
+        />
       </div>
 
       <div className="w-full max-w-sm z-10 pt-5 pb-32">
@@ -87,14 +121,14 @@ export default function PaywallPage() {
           </div>
 
           <h1 className="mt-3 text-3xl font-black tracking-tight leading-[1.05]">
-            Unlock Your <span className="text-cyan-400">Readiness Plan</span>
+            Unlock Your <span className={theme.accentText}>Readiness Plan</span>
           </h1>
 
           <p className="mt-2 text-slate-300 text-sm leading-relaxed">
             Your score is <span className="font-bold text-white">{readiness}%</span>{" "}
             <span className={`font-bold ${status.tone}`}>({status.label})</span>. Biggest risk:
             <span className="font-bold text-white"> {weakDomain}</span>{" "}
-            <span className="font-bold text-red-400">({weakPct}%)</span>. Unlock the exact fix plan + unlimited sims.
+            <span className="font-bold text-red-300">({weakPct}%)</span>. Unlock the fix plan + unlimited sims.
           </p>
         </motion.div>
 
@@ -123,9 +157,11 @@ export default function PaywallPage() {
           </div>
         </motion.div>
 
-        {/* ID card */}
+        {/* ID card (theme-aware) */}
         <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} className="mb-6">
-          <div className="bg-white rounded-2xl p-6 shadow-2xl shadow-blue-900/50 relative overflow-hidden text-black transform rotate-1 border-t-4 border-cyan-500">
+          <div
+            className={`bg-white rounded-2xl p-6 shadow-2xl shadow-blue-900/50 relative overflow-hidden text-black transform rotate-1 border-t-4 ${theme.idTopBorder}`}
+          >
             <div className="absolute inset-0 bg-gradient-to-br from-transparent via-white/35 to-transparent opacity-60 pointer-events-none" />
 
             <div className="flex justify-between items-start mb-6">
@@ -177,7 +213,7 @@ export default function PaywallPage() {
           </div>
         </motion.div>
 
-        {/* Value stack */}
+        {/* Value stack with ICONS (this is what you wanted from v2) */}
         <div className="mb-6 rounded-2xl bg-slate-900/45 border border-white/10 p-5">
           <div className="flex items-center justify-between">
             <h3 className="text-xs font-black text-slate-300 uppercase tracking-widest">
@@ -187,29 +223,35 @@ export default function PaywallPage() {
           </div>
 
           <div className="mt-4 space-y-3">
-            <CompareRow label="Unlimited full simulations (70–120Q)" />
-            <CompareRow label="3,000+ Question Bank + Rapid Drills" />
-            <CompareRow label="Clinical rationales + weakness fix plan" />
-            <CompareRow label="Readiness score + domain breakdown" />
-            <CompareRow label="EMT + Paramedic modes" />
-            <CompareRow
-              label="Pass Guarantee (refund if you complete the plan and don’t pass)"
+            <FeatureRow icon="🧪" text="CAT-style simulator (full 70–120Q exam mode)" />
+            <FeatureRow icon="📚" text="3,000+ question bank + rapid drills" />
+            <FeatureRow icon="🧠" text="Clinical rationales + your weakness fix plan" />
+            <FeatureRow icon="📈" text="Readiness score + domain breakdown tracking" />
+            <FeatureRow icon="⚡️" text="EMT + Paramedic modes (switch anytime)" />
+            <FeatureRow
+              icon="🛡️"
+              text="Pass Guarantee (refund if you complete the plan and don’t pass)"
               highlight
             />
           </div>
         </div>
 
-        {/* Plan selector */}
+        {/* Plan selector (theme-aware “Best Value”) */}
         <div className="mb-5 space-y-3">
           <PlanCard
             selected={selectedPlan === "annual"}
             onClick={() => setSelectedPlan("annual")}
             badge="Best Value"
+            badgeGradient={theme.badgeGradient}
             title="Annual Pro"
             subtitle={`Only ${fmt(annualMonthlyEquivalent)} /mo billed yearly`}
             rightTop={PRICING.annual.strike ? fmt(PRICING.annual.strike) : null}
             rightMain={`${fmt(PRICING.annual.price)}${PRICING.annual.cadence}`}
-            accent="cyan"
+            selectedStyle={{
+              bg: theme.accentBg,
+              ring: theme.accentBorder,
+              glow: theme.accentGlow,
+            }}
           />
 
           <PlanCard
@@ -219,7 +261,12 @@ export default function PaywallPage() {
             subtitle="Cancel anytime."
             rightTop={null}
             rightMain={`${fmt(PRICING.monthly.price)}${PRICING.monthly.cadence}`}
-            accent="blue"
+            badgeGradient={theme.badgeGradient}
+            selectedStyle={{
+              bg: "bg-blue-500/10",
+              ring: "border-blue-400/60",
+              glow: "shadow-[0_0_35px_-14px_rgba(59,130,246,0.45)]",
+            }}
           />
 
           <PlanCard
@@ -229,13 +276,18 @@ export default function PaywallPage() {
             subtitle="One-time payment. Own it forever."
             rightTop={PRICING.lifetime.strike ? fmt(PRICING.lifetime.strike) : null}
             rightMain={`${fmt(PRICING.lifetime.price)}${PRICING.lifetime.cadence}`}
-            accent="red"
+            badgeGradient={theme.badgeGradient}
+            selectedStyle={{
+              bg: "bg-red-500/10",
+              ring: "border-red-400/60",
+              glow: "shadow-[0_0_35px_-14px_rgba(239,68,68,0.45)]",
+            }}
           />
         </div>
 
-        {/* Annual nudge */}
-        <div className="mb-6 rounded-xl bg-blue-500/10 border border-blue-500/20 p-4">
-          <div className="text-sm font-extrabold text-blue-200">Why Annual wins</div>
+        {/* Annual nudge (theme-aware) */}
+        <div className={`mb-6 rounded-xl border p-4 ${theme.accentBg} ${theme.accentBorder}`}>
+          <div className={`text-sm font-extrabold ${theme.accentTextStrong}`}>Why Annual wins</div>
           <div className="mt-1 text-sm text-slate-300 leading-relaxed">
             Most candidates study for weeks. Annual keeps your progress + costs less than 7 months of monthly.
           </div>
@@ -284,10 +336,10 @@ export default function PaywallPage() {
         </div>
       </div>
 
-      {/* Sticky checkout */}
+      {/* Sticky checkout (theme-aware CTA) */}
       <div className="fixed bottom-0 left-0 right-0 z-20">
         <div className="mx-auto w-full max-w-sm px-4 pb-4">
-          <div className="rounded-2xl bg-[#0F172A]/90 backdrop-blur-xl border border-white/10 p-3 shadow-[0_-15px_40px_-20px_rgba(0,0,0,0.8)]">
+          <div className="rounded-2xl bg-black/30 backdrop-blur-xl border border-white/10 p-3 shadow-[0_-15px_40px_-20px_rgba(0,0,0,0.8)]">
             <div className="flex items-center justify-between px-1 pb-2">
               <div className="text-xs text-slate-300 font-semibold">
                 Selected:{" "}
@@ -296,24 +348,26 @@ export default function PaywallPage() {
                 </span>
               </div>
               <div className="text-xs text-slate-400 font-mono">
-                {selectedPlan === "annual" && (
-                  <>Save {fmt((PRICING.annual.strike ?? 0) - PRICING.annual.price)}</>
-                )}
+                {selectedPlan === "annual" && <>Save {fmt((PRICING.annual.strike ?? 0) - PRICING.annual.price)}</>}
                 {selectedPlan === "monthly" && <>Cancel anytime</>}
                 {selectedPlan === "lifetime" && <>Pay once</>}
               </div>
             </div>
 
-            <Link href={checkoutHref}>
+            <Link href={checkoutHref} className="block">
               <motion.button
                 whileHover={{ scale: 1.01 }}
                 whileTap={{ scale: 0.99 }}
-                className="w-full py-4 rounded-xl font-black text-lg text-white border border-white/10
-                           bg-gradient-to-r from-blue-600 to-cyan-500 shadow-lg hover:shadow-cyan-500/20 transition-all"
+                className={`w-full py-4 rounded-xl font-black text-lg text-white border border-white/10
+                           bg-gradient-to-r ${theme.ctaGradient} shadow-lg transition-all`}
               >
                 UNLOCK MY PLAN
               </motion.button>
             </Link>
+
+            <div className="mt-2 text-center text-[11px] text-slate-400 font-semibold">
+              Instant access • Cancel anytime (monthly) • Mobile friendly
+            </div>
 
             <div className="mt-3 flex flex-wrap items-center justify-center gap-2 opacity-90">
               <TrustChip icon={<ShieldIcon />} text="Secure checkout" />
@@ -330,53 +384,65 @@ export default function PaywallPage() {
 
 /* ----------------- Components ----------------- */
 
+function FeatureRow({
+  icon,
+  text,
+  highlight = false,
+}: {
+  icon: string;
+  text: string;
+  highlight?: boolean;
+}) {
+  return (
+    <div className="flex items-start gap-3">
+      <span className="text-lg leading-none mt-0.5">{icon}</span>
+      <span className={`text-sm leading-relaxed ${highlight ? "text-yellow-300 font-bold" : "text-slate-200"}`}>
+        {text}
+      </span>
+    </div>
+  );
+}
+
 type PlanCardProps = {
   selected: boolean;
   onClick: () => void;
   badge?: string;
+  badgeGradient: string;
   title: string;
   subtitle: string;
   rightTop: string | null;
   rightMain: string;
-  accent: "cyan" | "blue" | "red";
+  selectedStyle: {
+    bg: string;
+    ring: string;
+    glow: string;
+  };
 };
 
-function PlanCard({ selected, onClick, badge, title, subtitle, rightTop, rightMain, accent }: PlanCardProps) {
-  const accentStyles =
-    accent === "cyan"
-      ? {
-          ring: "border-cyan-400/70",
-          bg: "bg-cyan-500/10",
-          glow: "shadow-[0_0_35px_-14px_rgba(34,211,238,0.55)]",
-          badge: "from-cyan-400 to-blue-500",
-        }
-      : accent === "red"
-        ? {
-            ring: "border-red-400/60",
-            bg: "bg-red-500/10",
-            glow: "shadow-[0_0_35px_-14px_rgba(239,68,68,0.45)]",
-            badge: "from-red-500 to-rose-500",
-          }
-        : {
-            ring: "border-blue-400/60",
-            bg: "bg-blue-500/10",
-            glow: "shadow-[0_0_35px_-14px_rgba(59,130,246,0.45)]",
-            badge: "from-blue-500 to-cyan-500",
-          };
-
+function PlanCard({
+  selected,
+  onClick,
+  badge,
+  badgeGradient,
+  title,
+  subtitle,
+  rightTop,
+  rightMain,
+  selectedStyle,
+}: PlanCardProps) {
   return (
     <button
       onClick={onClick}
       className={[
         "relative w-full p-4 rounded-2xl border-2 transition-all duration-300 text-left",
         selected
-          ? `${accentStyles.bg} ${accentStyles.ring} ${accentStyles.glow}`
-          : "bg-slate-800/30 border-white/10 opacity-85 hover:opacity-100 hover:border-white/15",
+          ? `${selectedStyle.bg} ${selectedStyle.ring} ${selectedStyle.glow}`
+          : "bg-slate-800/30 border-white/10 opacity-90 hover:opacity-100 hover:border-white/15",
       ].join(" ")}
     >
       {selected && badge && (
         <div
-          className={`absolute -top-3 right-4 bg-gradient-to-r ${accentStyles.badge} text-white text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-wide shadow-lg`}
+          className={`absolute -top-3 right-4 bg-gradient-to-r ${badgeGradient} text-white text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-wide shadow-lg`}
         >
           {badge}
         </div>
@@ -397,43 +463,6 @@ function PlanCard({ selected, onClick, badge, title, subtitle, rightTop, rightMa
         </div>
       </div>
     </button>
-  );
-}
-
-function CompareRow({ label, highlight = false }: { label: string; highlight?: boolean }) {
-  return (
-    <div
-      className={[
-        "flex items-center gap-3 rounded-xl border px-4 py-3",
-        highlight
-          ? "bg-yellow-400/10 border-yellow-400/25"
-          : "bg-white/5 border-white/10",
-      ].join(" ")}
-    >
-      <span
-        className={[
-          "inline-flex items-center justify-center w-6 h-6 rounded-full border",
-          highlight
-            ? "bg-yellow-400/15 border-yellow-400/25"
-            : "bg-emerald-500/15 border-emerald-400/25",
-        ].join(" ")}
-      >
-        <svg
-          className={["w-3.5 h-3.5", highlight ? "text-yellow-300" : "text-emerald-300"].join(" ")}
-          fill="currentColor"
-          viewBox="0 0 20 20"
-        >
-          <path
-            fillRule="evenodd"
-            d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
-            clipRule="evenodd"
-          />
-        </svg>
-      </span>
-      <span className={["text-sm", highlight ? "text-yellow-200 font-bold" : "text-slate-200"].join(" ")}>
-        {label}
-      </span>
-    </div>
   );
 }
 
@@ -462,6 +491,7 @@ function FAQItem({ q, a }: { q: string; a: string }) {
         <span className="text-sm font-extrabold text-white">{q}</span>
         <span className="text-slate-300">{open ? "−" : "+"}</span>
       </button>
+
       <AnimatePresence initial={false}>
         {open && (
           <motion.div
