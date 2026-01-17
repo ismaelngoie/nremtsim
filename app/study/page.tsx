@@ -44,6 +44,9 @@ const icons: Record<string, string> = {
   "Airway & Respiratory": "🌬️",
   "Cardiac/Neuro/Endocrine": "⚕️",
 "EMS Ops/Ethics/Documentation": "⚖️",
+  "Trauma & Bleeding Control": "🩸",
+"Airway & Ventilation": "😮‍💨",
+"Cardiology/ECG & Arrest": "💓",
 };
 
 type Level = "EMT" | "Paramedic";
