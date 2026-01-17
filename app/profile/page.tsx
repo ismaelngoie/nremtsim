@@ -21,12 +21,6 @@ function normalizeLevel(x: unknown): Level {
   return x === "Paramedic" ? "Paramedic" : "EMT";
 }
 
-function normalizeAccess(x: unknown): "subscription" | "lifetime" | "pro" | "unknown" {
-  const v = String(x || "").toLowerCase();
-  if (v === "subscription" || v === "lifetime" || v === "pro") return v;
-  return "unknown";
-}
-
 export default function ProfilePage() {
   const router = useRouter();
 
@@ -37,12 +31,12 @@ export default function ProfilePage() {
   const [nameDraft, setNameDraft] = useState("FUTURE MEDIC");
   const [stats, setStats] = useState<Stats>({ drillsRun: 0, mastery: 0, daysActive: 1 });
 
-  // Billing / subscription
+  // Subscription management UI
+  const [manageOpen, setManageOpen] = useState(false);
   const [billingEmail, setBillingEmail] = useState("");
   const [billingEmailDraft, setBillingEmailDraft] = useState("");
   const [billingLoading, setBillingLoading] = useState(false);
   const [billingMsg, setBillingMsg] = useState<string | null>(null);
-  const [accessType, setAccessType] = useState<"subscription" | "lifetime" | "pro" | "unknown">("unknown");
 
   // Privacy accordion
   const [privacyOpen, setPrivacyOpen] = useState(false);
@@ -73,6 +67,7 @@ export default function ProfilePage() {
   useEffect(() => {
     const storedLevel = normalizeLevel(localStorage.getItem("userLevel"));
     const storedName = localStorage.getItem("userName") || "FUTURE MEDIC";
+
     setLevel(storedLevel);
     setName(storedName);
     setNameDraft(storedName);
@@ -92,13 +87,10 @@ export default function ProfilePage() {
       daysActive: Math.max(1, uniqueDays.size),
     });
 
-    // Billing info (set by your /pay restore)
-    const proEmail = (localStorage.getItem("proEmail") || "").trim().toLowerCase();
-    const proAccess = normalizeAccess(localStorage.getItem("proAccess"));
-
-    setBillingEmail(proEmail);
-    setBillingEmailDraft(proEmail);
-    setAccessType(proAccess);
+    // If you previously saved the billing email (e.g., after restore), preload it
+    const saved = (localStorage.getItem("proEmail") || "").trim().toLowerCase();
+    setBillingEmail(saved);
+    setBillingEmailDraft(saved);
   }, []);
 
   // --- Actions ---
@@ -121,22 +113,11 @@ export default function ProfilePage() {
     setEditName(false);
   };
 
-  const saveBillingEmail = () => {
-    const cleaned = billingEmailDraft.trim().toLowerCase();
-    if (!cleaned.includes("@")) {
-      setBillingMsg("Enter the Stripe checkout email.");
-      return;
-    }
-    localStorage.setItem("proEmail", cleaned);
-    setBillingEmail(cleaned);
-    setBillingEmailDraft(cleaned);
-    setBillingMsg("✅ Billing email saved.");
-  };
-
   const openBillingPortal = async () => {
     const email = (billingEmailDraft || billingEmail).trim().toLowerCase();
+
     if (!email.includes("@")) {
-      setBillingMsg("Enter the Stripe checkout email first.");
+      setBillingMsg("Enter the email you paid with.");
       return;
     }
 
@@ -144,7 +125,8 @@ export default function ProfilePage() {
     setBillingMsg(null);
 
     try {
-      const returnUrl = typeof window !== "undefined" ? `${window.location.origin}/profile` : "/profile";
+      const returnUrl =
+        typeof window !== "undefined" ? `${window.location.origin}/profile` : "/profile";
 
       const res = await fetch("/api/billing-portal", {
         method: "POST",
@@ -155,11 +137,11 @@ export default function ProfilePage() {
       const data = (await res.json()) as { ok?: boolean; url?: string; error?: string };
 
       if (!res.ok || !data.ok || !data.url) {
-        setBillingMsg(data?.error ? `❌ ${data.error}` : "❌ Could not open billing portal.");
+        setBillingMsg(data?.error ? `❌ ${data.error}` : "❌ Could not open billing settings.");
         return;
       }
 
-      // Save for next time (since everyone is paid)
+      // Save for next time
       localStorage.setItem("proEmail", email);
       setBillingEmail(email);
 
@@ -231,23 +213,20 @@ export default function ProfilePage() {
     router.replace("/dashboard");
   };
 
-  const accessLabel = useMemo(() => {
-    if (accessType === "lifetime") return "LIFETIME";
-    if (accessType === "subscription") return "SUBSCRIPTION";
-    if (accessType === "pro") return "PRO";
-    return "ACTIVE";
-  }, [accessType]);
-
   return (
     <div className={`min-h-screen ${theme.bg} text-white pb-32 font-sans relative overflow-x-hidden`}>
       {/* Background FX */}
       <div
-        className={`fixed -top-40 -right-40 w-96 h-96 ${isP ? "bg-rose-600/10" : "bg-cyan-500/10"} blur-[100px] rounded-full pointer-events-none`}
+        className={`fixed -top-40 -right-40 w-96 h-96 ${
+          isP ? "bg-rose-600/10" : "bg-cyan-500/10"
+        } blur-[100px] rounded-full pointer-events-none`}
       />
 
       <header className="px-6 pt-8 pb-4">
         <h1 className="text-3xl font-black text-white tracking-tight">Profile</h1>
-        <p className="text-slate-400 text-xs font-mono uppercase tracking-widest mt-1">Personnel Management</p>
+        <p className="text-slate-400 text-xs font-mono uppercase tracking-widest mt-1">
+          Personnel Management
+        </p>
       </header>
 
       <main className="px-4 space-y-6 max-w-md mx-auto">
@@ -291,12 +270,7 @@ export default function ProfilePage() {
                 </button>
               </div>
 
-              <div className="mt-1 flex items-center gap-2">
-                <p className={`text-xs font-black uppercase ${theme.accent}`}>{level} MODE</p>
-                <span className="text-[10px] font-black uppercase tracking-widest px-2 py-1 rounded bg-black/10 text-gray-700">
-                  {accessLabel}
-                </span>
-              </div>
+              <p className={`text-xs font-black uppercase mt-1 ${theme.accent}`}>{level} MODE</p>
             </div>
           </div>
 
@@ -323,7 +297,9 @@ export default function ProfilePage() {
               exit={{ opacity: 0, y: 10 }}
               className="rounded-2xl bg-slate-900/55 border border-white/10 p-4"
             >
-              <div className="text-xs font-black uppercase tracking-widest text-slate-400 mb-2">Operator Name</div>
+              <div className="text-xs font-black uppercase tracking-widest text-slate-400 mb-2">
+                Operator Name
+              </div>
 
               <input
                 value={nameDraft}
@@ -353,7 +329,9 @@ export default function ProfilePage() {
 
         {/* 2) MODE SWITCHER */}
         <section>
-          <h3 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-3 px-2">Operational Protocol</h3>
+          <h3 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-3 px-2">
+            Operational Protocol
+          </h3>
 
           <div className="bg-slate-900 border border-white/10 p-1.5 rounded-2xl flex relative">
             <motion.div
@@ -389,7 +367,9 @@ export default function ProfilePage() {
 
         {/* 3) SERVICE RECORD */}
         <section>
-          <h3 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-3 px-2">Service Record</h3>
+          <h3 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-3 px-2">
+            Service Record
+          </h3>
 
           <div className="grid grid-cols-3 gap-3">
             <div className="bg-slate-900/50 border border-white/5 p-3 rounded-xl text-center">
@@ -409,81 +389,103 @@ export default function ProfilePage() {
           </div>
         </section>
 
-        {/* 4) MANAGE SUBSCRIPTION */}
+        {/* 4) SUBSCRIPTION (button -> asks email) */}
         <section className="space-y-3">
-          <h3 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-1 px-2">Subscription</h3>
+          <h3 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-1 px-2">
+            Subscription
+          </h3>
 
           <div className="rounded-2xl bg-slate-900/55 border border-white/10 p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <div className="text-sm font-black text-white">Manage your plan</div>
-                <div className="text-[11px] text-slate-400 font-mono mt-1">
-                  Opens Stripe portal (cancel / pause / update payment).
-                </div>
-              </div>
+            <button
+              onClick={() => {
+                setManageOpen((v) => !v);
+                setBillingMsg(null);
+              }}
+              className={`w-full py-3 rounded-xl font-black text-sm border ${theme.border} ${theme.softBg} ${theme.chipText}`}
+            >
+              Manage Subscription
+            </button>
 
-              <a
-                href="mailto:contact@nremts.com?subject=Support%20Request%20-%20NREMTS&body=Please%20describe%20your%20issue%20and%20include%20the%20email%20used%20at%20checkout."
-                className="text-[10px] px-3 py-2 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 font-black uppercase tracking-widest"
-              >
-                Contact Support
-              </a>
-            </div>
-
-            <div className="mt-4">
-              <div className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">
-                Stripe checkout email
-              </div>
-
-              <div className="flex gap-2">
-                <input
-                  value={billingEmailDraft}
-                  onChange={(e) => setBillingEmailDraft(e.target.value)}
-                  placeholder="you@email.com"
-                  className="flex-1 bg-black/30 border border-white/10 rounded-xl px-3 py-3 text-sm text-white outline-none focus:border-white/20"
-                />
-                <button
-                  onClick={saveBillingEmail}
-                  className="px-4 py-3 rounded-xl font-black text-sm bg-white/10 border border-white/10 hover:bg-white/15"
+            <AnimatePresence initial={false}>
+              {manageOpen && (
+                <motion.div
+                  initial={{ opacity: 0, y: 8, height: 0 }}
+                  animate={{ opacity: 1, y: 0, height: "auto" }}
+                  exit={{ opacity: 0, y: 8, height: 0 }}
+                  transition={{ duration: 0.18 }}
+                  className="mt-4 overflow-hidden"
                 >
-                  SAVE
-                </button>
-              </div>
+                  <div className="text-[11px] text-slate-300 font-semibold">
+                    Enter the email you paid with
+                  </div>
 
-              <div className="mt-3 grid grid-cols-1 gap-2">
-                <button
-                  onClick={openBillingPortal}
-                  disabled={billingLoading}
-                  className={`w-full py-3 rounded-xl font-black text-sm border ${theme.border} ${theme.softBg} ${theme.chipText} disabled:opacity-60`}
-                >
-                  {billingLoading ? "OPENING..." : "MANAGE SUBSCRIPTION (STRIPE)"}
-                </button>
-              </div>
+                  <div className="mt-2 flex gap-2">
+                    <input
+                      value={billingEmailDraft}
+                      onChange={(e) => setBillingEmailDraft(e.target.value)}
+                      placeholder="you@email.com"
+                      className="flex-1 bg-black/30 border border-white/10 rounded-xl px-3 py-3 text-sm text-white outline-none focus:border-white/20"
+                    />
+                    <button
+                      onClick={openBillingPortal}
+                      disabled={billingLoading}
+                      className="px-4 py-3 rounded-xl font-black text-sm bg-white/10 border border-white/10 hover:bg-white/15 disabled:opacity-60"
+                    >
+                      {billingLoading ? "..." : "Continue"}
+                    </button>
+                  </div>
 
-              <AnimatePresence initial={false}>
-                {billingMsg && (
-                  <motion.div
-                    initial={{ opacity: 0, y: 6 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: 6 }}
-                    className="mt-3 text-sm text-slate-200"
-                  >
-                    {billingMsg}
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </div>
+                  <AnimatePresence initial={false}>
+                    {billingMsg && (
+                      <motion.div
+                        initial={{ opacity: 0, y: 6 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: 6 }}
+                        className="mt-3 text-sm text-slate-200"
+                      >
+                        {billingMsg}
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
         </section>
 
-        {/* 5) DATA CONTROLS */}
+        {/* 5) HELP & SUPPORT (separate, under subscription) */}
+        <section className="space-y-3">
+          <h3 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-1 px-2">
+            Help & Support
+          </h3>
+
+          <a
+            href="mailto:contact@nremts.com?subject=Support%20Request%20-%20NREMTS&body=Please%20include%20the%20email%20you%20paid%20with%20and%20a%20brief%20description%20of%20the%20issue."
+            className="w-full bg-slate-900/50 border border-white/10 p-4 rounded-xl flex items-center justify-between hover:bg-white/5 transition-colors"
+          >
+            <div className="flex items-center gap-3">
+              <div className={`w-8 h-8 rounded-full ${theme.softBg} flex items-center justify-center text-lg`}>
+                ✉️
+              </div>
+              <div className="text-left">
+                <div className="text-sm font-bold text-white">Contact Support</div>
+                <div className="text-[10px] text-slate-400">contact@nremts.com</div>
+              </div>
+            </div>
+            <div className="text-slate-500">→</div>
+          </a>
+        </section>
+
+        {/* 6) DATA CONTROLS */}
         <section className="space-y-3">
           <button
             onClick={exportData}
             className="w-full bg-slate-900/50 border border-white/5 p-4 rounded-xl flex items-center justify-between hover:bg-white/5 transition-colors"
           >
             <div className="flex items-center gap-3">
-              <div className={`w-8 h-8 rounded-full ${theme.softBg} flex items-center justify-center text-lg`}>⛭</div>
+              <div className={`w-8 h-8 rounded-full ${theme.softBg} flex items-center justify-center text-lg`}>
+                ⛭
+              </div>
               <div className="text-left">
                 <div className="text-sm font-bold text-white">Export Data</div>
                 <div className="text-[10px] text-slate-400">Copies your progress JSON</div>
@@ -508,7 +510,7 @@ export default function ProfilePage() {
           </button>
         </section>
 
-        {/* 6) PRIVACY + DISCLAIMER (BOTTOM ONLY) */}
+        {/* 7) PRIVACY + DISCLAIMER (BOTTOM ONLY) */}
         <section className="pt-2">
           <div className="rounded-2xl bg-slate-900/40 border border-white/10 overflow-hidden">
             <button
@@ -539,8 +541,8 @@ export default function ProfilePage() {
                       browser storage. If you clear site data, your local progress may be removed.
                     </p>
                     <p>
-                      Payments are processed by Stripe. We do not store your card numbers or banking details on our
-                      servers. Stripe may collect and process payment information under its own policies.
+                      Payments are processed by a third-party payment processor. We do not store your card numbers or
+                      banking details on our servers.
                     </p>
 
                     <p className="text-xs text-slate-400 font-mono uppercase tracking-widest">Disclaimer</p>
@@ -559,7 +561,7 @@ export default function ProfilePage() {
                       Need help?{" "}
                       <a
                         className="underline text-white font-bold"
-                        href="mailto:contact@nremts.com?subject=Support%20Request%20-%20NREMTS&body=Please%20include%20the%20email%20used%20at%20checkout%20and%20a%20description%20of%20the%20issue."
+                        href="mailto:contact@nremts.com?subject=Support%20Request%20-%20NREMTS&body=Please%20include%20the%20email%20you%20paid%20with%20and%20a%20brief%20description%20of%20the%20issue."
                       >
                         contact@nremts.com
                       </a>
