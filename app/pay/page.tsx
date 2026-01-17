@@ -19,7 +19,7 @@ type PricingTier = {
 const STRIPE_LINKS: Record<PlanKey, string> = {
   annual: "PASTE_YOUR_ANNUAL_PAYMENT_LINK_HERE",
   monthly: "PASTE_YOUR_MONTHLY_PAYMENT_LINK_HERE",
-  lifetime: "PASTE_YOUR_LIFETIME_PAYMENT_LINK_HERE",
+  lifetime: "https://buy.stripe.com/test_14A14ocUi61x2JN2k96J200",
 };
 
 const PRICING: Record<PlanKey, PricingTier> = {
