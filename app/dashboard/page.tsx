@@ -94,9 +94,17 @@ function daysUntil(dateISO: string) {
   return Math.ceil(diff / (1000 * 60 * 60 * 24));
 }
 
+/**
+ * Normalize any of:
+ * - old PerfMap { [cat]: {attempts,last,best,avg,updatedAt} }
+ * - old arrays [{category,score/accuracy,...}]
+ * - NEW store shapes:
+ *   { [cat]: { attempts, correct, total, lastPct, lastAt } }
+ */
 function normalizePerf(raw: unknown): PerfMap {
   const out: PerfMap = {};
 
+  // Array style
   if (Array.isArray(raw)) {
     for (const item of raw) {
       if (!item || typeof item !== "object") continue;
@@ -105,18 +113,29 @@ function normalizePerf(raw: unknown): PerfMap {
       const category = String(anyItem.category || anyItem.name || "").trim();
       if (!category) continue;
 
-      const lastNum = Number(anyItem.lastPct ?? anyItem.last ?? anyItem.score ?? anyItem.accuracy ?? anyItem.value);
+      const lastNum = Number(
+        anyItem.lastPct ??
+          anyItem.last ??
+          anyItem.score ??
+          anyItem.accuracy ??
+          anyItem.value
+      );
       if (!Number.isFinite(lastNum)) continue;
 
       const last = clamp(Math.round(lastNum));
       const attemptsNum = Number(anyItem.attempts);
-      const attempts = Number.isFinite(attemptsNum) && attemptsNum > 0 ? Math.floor(attemptsNum) : 1;
+      const attempts =
+        Number.isFinite(attemptsNum) && attemptsNum > 0
+          ? Math.floor(attemptsNum)
+          : 1;
 
       const correctNum = Number(anyItem.correct);
       const totalNum = Number(anyItem.total);
 
       const avgFromTotals =
-        Number.isFinite(correctNum) && Number.isFinite(totalNum) && totalNum > 0
+        Number.isFinite(correctNum) &&
+        Number.isFinite(totalNum) &&
+        totalNum > 0
           ? clamp(Math.round((correctNum / totalNum) * 100))
           : last;
 
@@ -126,16 +145,25 @@ function normalizePerf(raw: unknown): PerfMap {
       out[category] = {
         attempts,
         last,
-        best: Number.isFinite(bestNum) ? clamp(Math.round(bestNum)) : Math.max(last, avgFromTotals),
-        avg: Number.isFinite(avgNum) ? clamp(Math.round(avgNum)) : avgFromTotals,
+        best: Number.isFinite(bestNum)
+          ? clamp(Math.round(bestNum))
+          : Math.max(last, avgFromTotals),
+        avg: Number.isFinite(avgNum)
+          ? clamp(Math.round(avgNum))
+          : avgFromTotals,
         updatedAt: Number(anyItem.lastAt ?? anyItem.updatedAt) || Date.now(),
-        lastCorrect: Number.isFinite(correctNum) ? Math.max(0, Math.floor(correctNum)) : undefined,
-        lastTotal: Number.isFinite(totalNum) ? Math.max(0, Math.floor(totalNum)) : undefined,
+        lastCorrect: Number.isFinite(correctNum)
+          ? Math.max(0, Math.floor(correctNum))
+          : undefined,
+        lastTotal: Number.isFinite(totalNum)
+          ? Math.max(0, Math.floor(totalNum))
+          : undefined,
       };
     }
     return out;
   }
 
+  // Object style
   if (raw && typeof raw === "object") {
     const obj = raw as Record<string, any>;
 
@@ -143,25 +171,40 @@ function normalizePerf(raw: unknown): PerfMap {
       const category = String(categoryRaw || "").trim();
       if (!category) continue;
 
+      // category: 72 (number)
       if (typeof val === "number") {
         const s = clamp(Math.round(val));
-        out[category] = { attempts: 1, last: s, best: s, avg: s, updatedAt: Date.now() };
+        out[category] = {
+          attempts: 1,
+          last: s,
+          best: s,
+          avg: s,
+          updatedAt: Date.now(),
+        };
         continue;
       }
 
+      // category: { ... }
       if (val && typeof val === "object") {
-        const lastNum = Number(val.lastPct ?? val.last ?? val.score ?? val.accuracy ?? val.value);
+        const lastNum = Number(
+          val.lastPct ?? val.last ?? val.score ?? val.accuracy ?? val.value
+        );
         if (!Number.isFinite(lastNum)) continue;
         const last = clamp(Math.round(lastNum));
 
         const attemptsNum = Number(val.attempts);
-        const attempts = Number.isFinite(attemptsNum) && attemptsNum > 0 ? Math.floor(attemptsNum) : 1;
+        const attempts =
+          Number.isFinite(attemptsNum) && attemptsNum > 0
+            ? Math.floor(attemptsNum)
+            : 1;
 
         const correctNum = Number(val.correct);
         const totalNum = Number(val.total);
 
         const avgFromTotals =
-          Number.isFinite(correctNum) && Number.isFinite(totalNum) && totalNum > 0
+          Number.isFinite(correctNum) &&
+          Number.isFinite(totalNum) &&
+          totalNum > 0
             ? clamp(Math.round((correctNum / totalNum) * 100))
             : last;
 
@@ -171,11 +214,19 @@ function normalizePerf(raw: unknown): PerfMap {
         out[category] = {
           attempts,
           last,
-          best: Number.isFinite(bestNum) ? clamp(Math.round(bestNum)) : Math.max(last, avgFromTotals),
-          avg: Number.isFinite(avgNum) ? clamp(Math.round(avgNum)) : avgFromTotals,
+          best: Number.isFinite(bestNum)
+            ? clamp(Math.round(bestNum))
+            : Math.max(last, avgFromTotals),
+          avg: Number.isFinite(avgNum)
+            ? clamp(Math.round(avgNum))
+            : avgFromTotals,
           updatedAt: Number(val.lastAt ?? val.updatedAt) || Date.now(),
-          lastCorrect: Number.isFinite(correctNum) ? Math.max(0, Math.floor(correctNum)) : undefined,
-          lastTotal: Number.isFinite(totalNum) ? Math.max(0, Math.floor(totalNum)) : undefined,
+          lastCorrect: Number.isFinite(correctNum)
+            ? Math.max(0, Math.floor(correctNum))
+            : undefined,
+          lastTotal: Number.isFinite(totalNum)
+            ? Math.max(0, Math.floor(totalNum))
+            : undefined,
         };
       }
     }
@@ -186,7 +237,8 @@ function normalizePerf(raw: unknown): PerfMap {
 
 function readFirstExistingJSON<T>(keys: string[], fallback: T): T {
   for (const k of keys) {
-    const raw = typeof window !== "undefined" ? localStorage.getItem(k) : null;
+    const raw =
+      typeof window !== "undefined" ? localStorage.getItem(k) : null;
     if (!raw) continue;
     return safeJSON<T>(raw, fallback);
   }
@@ -196,12 +248,16 @@ function readFirstExistingJSON<T>(keys: string[], fallback: T): T {
 function extractCompletionDateFromResult(obj: any): Date | null {
   if (!obj || typeof obj !== "object") return null;
 
-  const ts = Number(obj.at ?? obj.endedAt ?? obj.completedAt ?? obj.timestamp ?? obj.time);
+  // common timestamp fields
+  const ts = Number(
+    obj.at ?? obj.endedAt ?? obj.completedAt ?? obj.timestamp ?? obj.time
+  );
   if (Number.isFinite(ts) && ts > 0) {
     const d = new Date(ts);
     if (!Number.isNaN(d.getTime())) return d;
   }
 
+  // ISO date string fields
   const iso = obj.dateISO ?? obj.date;
   if (typeof iso === "string" && iso.length >= 8) {
     const d = new Date(iso);
@@ -213,11 +269,14 @@ function extractCompletionDateFromResult(obj: any): Date | null {
 
 function upsertShiftHistoryForDate(d: Date) {
   const dayStr = d.toDateString();
-  const existing = safeJSON<string[]>(localStorage.getItem("shift-history"), []);
+  const existing = safeJSON<string[]>(
+    localStorage.getItem("shift-history"),
+    []
+  );
   const set = new Set(existing);
   set.add(dayStr);
   localStorage.setItem("shift-history", JSON.stringify(Array.from(set)));
-  localStorage.setItem("last-shift-date", dayStr);
+  localStorage.setItem("last-shift-date", dayStr); // legacy compatibility
 }
 
 export default function DashboardPage() {
@@ -247,19 +306,44 @@ export default function DashboardPage() {
 
   const isP = level === "Paramedic";
 
-  // ✅ Fire conversion ONLY when dashboard has ?plan=monthly|annual|lifetime, then remove plan from URL
+  // ✅ Google Ads conversion:
+  // Fires ONLY when dashboard has ?plan=monthly|annual|lifetime
+  // Uses real prices 19 / 119 / 249
+  // Uses transaction_id = timestamp (Date.now())
+  // Prevents duplicates on refresh:
+  //   - removes ?plan from URL after firing
+  //   - sessionStorage guard if user hits the same URL again
   useEffect(() => {
     if (typeof window === "undefined") return;
 
     const url = new URL(window.location.href);
     const plan = (url.searchParams.get("plan") || "").toLowerCase();
 
-    // Only count real post-payment redirects
-    const allowed = plan === "monthly" || plan === "annual" || plan === "lifetime";
-    if (!allowed) return;
+    const PLAN_VALUE: Record<string, number> = {
+      monthly: 19,
+      annual: 119,
+      lifetime: 249,
+    };
+
+    if (!(plan in PLAN_VALUE)) return;
+
+    // ✅ session guard: prevents double-firing even if the user re-opens same URL with plan again
+    const firedKey = `ads_purchase_fired_${plan}`;
+    if (sessionStorage.getItem(firedKey) === "1") {
+      // still clean URL so refresh doesn't show plan
+      url.searchParams.delete("plan");
+      window.history.replaceState({}, "", url.pathname + url.search + url.hash);
+      return;
+    }
+
+    const value = PLAN_VALUE[plan];
+
+    // ✅ transaction_id from timestamp (unique enough for your use case)
+    const transaction_id = String(Date.now());
 
     const w = window as any;
     w.dataLayer = w.dataLayer || [];
+
     const gtag =
       typeof w.gtag === "function"
         ? w.gtag
@@ -268,20 +352,23 @@ export default function DashboardPage() {
           };
 
     try {
-      // small robustness: ensure config exists even if init script hasn’t run yet
+      // robustness: ensure config exists even if init script hasn’t run yet
       gtag("config", "AW-17883612588");
 
       gtag("event", "conversion", {
         send_to: "AW-17883612588/eEaJCJm9oOcbEKyLyc9C",
-        value: 1.0,
+        value, // ✅ 19 / 119 / 249
         currency: "USD",
-        transaction_id: "",
+        transaction_id, // ✅ timestamp
       });
+
+      // mark as fired so it can’t fire again this session for this plan
+      sessionStorage.setItem(firedKey, "1");
     } catch {
-      // still clean URL to avoid repeat firing
+      // if anything fails, we still clean URL below
     }
 
-    // ✅ prevent double-counting on refresh
+    // ✅ prevent duplicate firing on refresh: remove plan from the URL
     url.searchParams.delete("plan");
     window.history.replaceState({}, "", url.pathname + url.search + url.hash);
   }, []);
@@ -293,7 +380,9 @@ export default function DashboardPage() {
       accentStrong: isP ? "text-rose-200" : "text-cyan-200",
       bar: isP ? "bg-rose-500" : "bg-cyan-400",
       btn: isP ? "from-rose-600 to-red-500" : "from-blue-600 to-cyan-500",
-      chip: isP ? "bg-rose-500/10 border-rose-500/20" : "bg-cyan-500/10 border-cyan-500/20",
+      chip: isP
+        ? "bg-rose-500/10 border-rose-500/20"
+        : "bg-cyan-500/10 border-cyan-500/20",
       chipText: isP ? "text-rose-200" : "text-cyan-200",
       glowA: isP ? "bg-rose-500/10" : "bg-cyan-500/10",
       glowB: isP ? "bg-red-600/10" : "bg-blue-600/10",
@@ -311,9 +400,20 @@ export default function DashboardPage() {
   }, [readiness]);
 
   const nextAction = useMemo(() => {
-    if (readiness < 65) return { title: "Fix your weakest domain", sub: `Start ${weakDomain} drills now.` };
-    if (readiness < 80) return { title: "Stabilize + retest", sub: `Do a drill then run a full sim.` };
-    return { title: "Maintain peak readiness", sub: `Full sim + review misses.` };
+    if (readiness < 65)
+      return {
+        title: "Fix your weakest domain",
+        sub: `Start ${weakDomain} drills now.`,
+      };
+    if (readiness < 80)
+      return {
+        title: "Stabilize + retest",
+        sub: `Do a drill then run a full sim.`,
+      };
+    return {
+      title: "Maintain peak readiness",
+      sub: `Full sim + review misses.`,
+    };
   }, [readiness, weakDomain]);
 
   const ROUTES = useMemo(
@@ -327,8 +427,10 @@ export default function DashboardPage() {
 
   const computeStreakDots = useCallback(() => {
     const todayStr = new Date().toDateString();
-    const shiftHistory = new Set(safeJSON<string[]>(localStorage.getItem("shift-history"), []));
-    const lastShiftDate = localStorage.getItem("last-shift-date");
+    const shiftHistory = new Set(
+      safeJSON<string[]>(localStorage.getItem("shift-history"), [])
+    );
+    const lastShiftDate = localStorage.getItem("last-shift-date"); // legacy
     const todayDone = shiftHistory.has(todayStr) || lastShiftDate === todayStr;
 
     setShiftComplete(todayDone);
@@ -354,12 +456,20 @@ export default function DashboardPage() {
   }, [examDate]);
 
   const refreshFromStorage = useCallback(() => {
+    // Level + name
     const lvl = (localStorage.getItem("userLevel") as Level) || "EMT";
     const normalized: Level = lvl === "Paramedic" ? "Paramedic" : "EMT";
     setLevel(normalized);
     setUserName(localStorage.getItem("userName") || "FUTURE MEDIC");
 
-    const lastShiftKeys = ["last-shift-result", "lastShiftResult", "lastDrillResult", "stationLastResult", "last-session-result"];
+    // --- AUTO-RECONCILE SHIFT HISTORY (supports old/new station storage) ---
+    const lastShiftKeys = [
+      "last-shift-result",
+      "lastShiftResult",
+      "lastDrillResult",
+      "stationLastResult",
+      "last-session-result",
+    ];
     const lastShiftRes = readFirstExistingJSON<any>(lastShiftKeys, null);
 
     const completionDate = extractCompletionDateFromResult(lastShiftRes);
@@ -373,6 +483,7 @@ export default function DashboardPage() {
       }
     }
 
+    // --- PERFORMANCE ---
     const perfRaw = readFirstExistingJSON<unknown>(
       [
         "category-performance",
@@ -388,9 +499,15 @@ export default function DashboardPage() {
 
     let perfMap = normalizePerf(perfRaw);
 
+    // Merge last-shift-result (if it includes category + pct, and optionally correct/total)
     if (lastShiftRes && typeof lastShiftRes === "object") {
       const cat = String(lastShiftRes.category || lastShiftRes.domain || "").trim();
-      const scoreNum = Number(lastShiftRes.pct ?? lastShiftRes.score ?? lastShiftRes.accuracy ?? lastShiftRes.value);
+      const scoreNum = Number(
+        lastShiftRes.pct ??
+          lastShiftRes.score ??
+          lastShiftRes.accuracy ??
+          lastShiftRes.value
+      );
       const atNum = Number(lastShiftRes.at ?? lastShiftRes.completedAt ?? lastShiftRes.endedAt);
 
       const correctNum = Number(lastShiftRes.correct);
@@ -404,7 +521,9 @@ export default function DashboardPage() {
         if (!existing || (existing.updatedAt ?? 0) < updatedAt) {
           const attempts = existing ? existing.attempts + 1 : 1;
           const best = existing ? Math.max(existing.best, score) : score;
-          const avg = existing ? clamp(Math.round((existing.avg * existing.attempts + score) / attempts)) : score;
+          const avg = existing
+            ? clamp(Math.round((existing.avg * existing.attempts + score) / attempts))
+            : score;
 
           perfMap[cat] = {
             attempts,
@@ -412,13 +531,18 @@ export default function DashboardPage() {
             best,
             avg,
             updatedAt,
-            lastCorrect: Number.isFinite(correctNum) ? Math.max(0, Math.floor(correctNum)) : existing?.lastCorrect,
-            lastTotal: Number.isFinite(totalNum) ? Math.max(0, Math.floor(totalNum)) : existing?.lastTotal,
+            lastCorrect: Number.isFinite(correctNum)
+              ? Math.max(0, Math.floor(correctNum))
+              : existing?.lastCorrect,
+            lastTotal: Number.isFinite(totalNum)
+              ? Math.max(0, Math.floor(totalNum))
+              : existing?.lastTotal,
           };
         }
       }
     }
 
+    // Merge last-exam-result perCategory
     const lastExam = safeJSONNullable<ExamResult>(localStorage.getItem("last-exam-result"));
     if (lastExam && lastExam.perCategory && typeof lastExam.perCategory === "object") {
       const at = Number(lastExam.at) || Date.now();
@@ -436,7 +560,9 @@ export default function DashboardPage() {
         if (!existing || (existing.updatedAt ?? 0) < at) {
           const attempts = existing ? existing.attempts + 1 : 1;
           const best = existing ? Math.max(existing.best, pct) : pct;
-          const avg = existing ? clamp(Math.round((existing.avg * existing.attempts + pct) / attempts)) : pct;
+          const avg = existing
+            ? clamp(Math.round((existing.avg * existing.attempts + pct) / attempts))
+            : pct;
 
           perfMap[cat] = {
             attempts,
@@ -444,8 +570,12 @@ export default function DashboardPage() {
             best,
             avg,
             updatedAt: at,
-            lastCorrect: Number.isFinite(correct) ? Math.max(0, Math.floor(correct)) : existing?.lastCorrect,
-            lastTotal: Number.isFinite(total) ? Math.max(0, Math.floor(total)) : existing?.lastTotal,
+            lastCorrect: Number.isFinite(correct)
+              ? Math.max(0, Math.floor(correct))
+              : existing?.lastCorrect,
+            lastTotal: Number.isFinite(total)
+              ? Math.max(0, Math.floor(total))
+              : existing?.lastTotal,
           };
         }
       }
@@ -453,6 +583,7 @@ export default function DashboardPage() {
 
     setPerf(perfMap);
 
+    // --- WEAK DOMAIN (prefer saved; else compute) ---
     const storedWeak = localStorage.getItem("weakestDomain");
     if (storedWeak) {
       setWeakDomain(storedWeak);
@@ -471,20 +602,25 @@ export default function DashboardPage() {
       }
     }
 
+    // --- READINESS ---
     const rs = Number(localStorage.getItem("readinessScore"));
     if (Number.isFinite(rs)) {
       setReadiness(clamp(Math.round(rs)));
     } else {
-      const vals = Object.values(perfMap).map((v) => v.avg).filter((x) => Number.isFinite(x));
+      const vals = Object.values(perfMap)
+        .map((v) => v.avg)
+        .filter((x) => Number.isFinite(x));
       if (vals.length) {
         const avg = clamp(Math.round(vals.reduce((a, b) => a + b, 0) / vals.length));
         setReadiness(avg);
       }
     }
 
+    // Status label
     const sl = localStorage.getItem("statusLabel");
     if (sl) setStatusLabel(sl);
 
+    // Diagnostic extras
     const pp = Number(localStorage.getItem("passProbability"));
     const cl = Number(localStorage.getItem("confidenceLow"));
     const ch = Number(localStorage.getItem("confidenceHigh"));
@@ -492,6 +628,7 @@ export default function DashboardPage() {
     setCiLow(Number.isFinite(cl) ? clamp(Math.round(cl)) : null);
     setCiHigh(Number.isFinite(ch) ? clamp(Math.round(ch)) : null);
 
+    // Domain breakdown
     const db = safeJSON<DomainRow[]>(localStorage.getItem("domainBreakdown"), []);
     if (Array.isArray(db) && db.length) {
       const sorted = [...db].sort((a, b) => a.accuracy - b.accuracy);
@@ -500,6 +637,7 @@ export default function DashboardPage() {
       setDomainBreakdown([]);
     }
 
+    // Missed question
     const da = safeJSON<DiagnosticAnswer[]>(localStorage.getItem("diagnosticAnswers"), []);
     if (Array.isArray(da) && da.length) {
       setMissed(da.find((a) => a && a.isCorrect === false) || null);
@@ -507,6 +645,7 @@ export default function DashboardPage() {
       setMissed(null);
     }
 
+    // Exam date
     const storedExam = localStorage.getItem("exam-date");
     if (storedExam) {
       setExamDate(storedExam);
@@ -517,6 +656,7 @@ export default function DashboardPage() {
       if (Number.isFinite(dte) && dte >= 0 && dte <= 365) setDaysToExam(Math.round(dte));
     }
 
+    // Streak dots
     computeStreakDots();
   }, [computeStreakDots]);
 
@@ -533,6 +673,7 @@ export default function DashboardPage() {
     };
     document.addEventListener("visibilitychange", onVis);
 
+    // if another tab updates localStorage, reflect it
     const onStorage = () => refreshFromStorage();
     window.addEventListener("storage", onStorage);
 
@@ -567,9 +708,7 @@ export default function DashboardPage() {
       {/* Background */}
       <div className={`fixed inset-0 pointer-events-none ${theme.grid} bg-[length:100%_4px] opacity-20`} />
       <div className="absolute inset-0 pointer-events-none">
-        <div
-          className={`absolute -top-28 left-1/2 -translate-x-1/2 w-[720px] h-[720px] ${theme.glowA} blur-[140px] rounded-full`}
-        />
+        <div className={`absolute -top-28 left-1/2 -translate-x-1/2 w-[720px] h-[720px] ${theme.glowA} blur-[140px] rounded-full`} />
         <div className={`absolute -left-40 top-[30%] w-[560px] h-[560px] ${theme.glowB} blur-[140px] rounded-full`} />
         <div className="absolute -right-40 bottom-[-15%] w-[560px] h-[560px] bg-white/5 blur-[160px] rounded-full" />
       </div>
@@ -585,13 +724,17 @@ export default function DashboardPage() {
           </div>
 
           <h1 className="mt-3 text-2xl font-black text-white tracking-tight leading-none">
-            {statusLabel} <span className="text-white/40">•</span> <span className="text-white/70">{userName}</span>
+            {statusLabel} <span className="text-white/40">•</span>{" "}
+            <span className="text-white/70">{userName}</span>
           </h1>
 
           <div className="mt-2 flex items-center gap-2 text-[11px] text-slate-400 font-mono">
             <span>T-{daysToExam} days</span>
             <span className="text-white/15">|</span>
-            <button onClick={() => setShowExamSetter((v) => !v)} className="text-slate-300 hover:text-white">
+            <button
+              onClick={() => setShowExamSetter((v) => !v)}
+              className="text-slate-300 hover:text-white"
+            >
               {examDate ? "edit exam date" : "set exam date"}
             </button>
           </div>
@@ -683,7 +826,9 @@ export default function DashboardPage() {
 
           <div className="flex justify-between items-start gap-3 mb-3">
             <div>
-              <h3 className="text-slate-400 text-xs font-black uppercase tracking-widest mb-1">Daily Mission</h3>
+              <h3 className="text-slate-400 text-xs font-black uppercase tracking-widest mb-1">
+                Daily Mission
+              </h3>
 
               <h2 className={`text-xl font-black leading-tight ${shiftComplete ? "text-white" : theme.accentStrong}`}>
                 {shiftComplete ? "Shift Complete" : "Start Your Shift"}
@@ -694,6 +839,7 @@ export default function DashboardPage() {
               </p>
             </div>
 
+            {/* Real dots */}
             <div className="flex gap-2">
               {streakDays.map((item, i) => (
                 <div key={i} className="flex flex-col items-center gap-1">
@@ -749,12 +895,18 @@ export default function DashboardPage() {
           <div className="flex items-center justify-between">
             <h3 className="text-xs font-black text-slate-300 uppercase tracking-widest">Performance</h3>
             <span className={`text-[11px] font-mono ${theme.accent}`}>
-              {Object.keys(perf).length > 0 ? "from drills + simulator" : domainBreakdown.length > 0 ? "from diagnostic" : "—"}
+              {Object.keys(perf).length > 0
+                ? "from drills + simulator"
+                : domainBreakdown.length > 0
+                ? "from diagnostic"
+                : "—"}
             </span>
           </div>
 
           {perfRows.length === 0 ? (
-            <div className="mt-3 text-sm text-slate-400">No performance data yet. Start a drill or run a full simulator.</div>
+            <div className="mt-3 text-sm text-slate-400">
+              No performance data yet. Start a drill or run a full simulator.
+            </div>
           ) : (
             <div className="mt-4 space-y-2">
               {perfRows.map((r) => (
@@ -765,7 +917,9 @@ export default function DashboardPage() {
 
                       <div className="text-[11px] text-slate-400 font-mono">
                         last {r.last}% • best {r.best}% • avg {r.avg}% • {r.attempts}x
-                        {typeof r.lastCorrect === "number" && typeof r.lastTotal === "number" && r.lastTotal > 0 ? (
+                        {typeof r.lastCorrect === "number" &&
+                        typeof r.lastTotal === "number" &&
+                        r.lastTotal > 0 ? (
                           <> • {r.lastCorrect}/{r.lastTotal}</>
                         ) : null}
                       </div>
@@ -853,7 +1007,9 @@ export default function DashboardPage() {
 
             <div className="mt-3 text-sm font-extrabold text-white leading-relaxed">{missed.text}</div>
 
-            <div className="mt-3 text-[11px] text-slate-400 font-semibold">Tap “Review Misses” to see rationales and lock it in.</div>
+            <div className="mt-3 text-[11px] text-slate-400 font-semibold">
+              Tap “Review Misses” to see rationales and lock it in.
+            </div>
 
             <div className="mt-4">
               <Link
