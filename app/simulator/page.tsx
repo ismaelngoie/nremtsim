@@ -493,4 +493,195 @@ export default function SimulatorPage() {
             </div>
             <div className="bg-white/5 p-4 rounded-2xl border border-white/5">
               <div className="text-[10px] text-slate-500 uppercase tracking-widest font-bold">Flagged</div>
-              <div className="text-2xl font-black text-white">{flaggedC
+              <div className="text-2xl font-black text-white">{flaggedCount}</div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 gap-3">
+            <button
+              onClick={startNewExam}
+              className={`w-full py-4 rounded-xl font-black text-white shadow-lg transition-all hover:scale-[1.02] active:scale-[0.98] ${theme.btn}`}
+            >
+              RUN ANOTHER SIMULATION
+            </button>
+
+            <Link href="/dashboard" className="block w-full py-4 bg-white text-slate-900 font-black rounded-xl hover:bg-slate-200 transition-colors">
+              RETURN TO HQ
+            </Link>
+          </div>
+        </motion.div>
+      </div>
+    );
+  }
+
+  // --- RENDER: ACTIVE EXAM ---
+  if (!currentQ) return <div className={`min-h-screen ${theme.bg}`} />;
+
+  return (
+    <div className={`min-h-screen ${theme.bg} text-white font-sans flex flex-col`}>
+      {/* HUD Header */}
+      <header className="px-6 py-4 bg-slate-950 border-b border-white/5 flex justify-between items-center sticky top-0 z-30">
+        <div className="flex items-center gap-6">
+          <div className="flex flex-col">
+            <span className="text-[10px] text-slate-500 uppercase tracking-widest font-bold">Time Remaining</span>
+            <span className={`text-xl font-mono font-bold ${timeLeft < 300 ? "text-red-500 animate-pulse" : "text-white"}`}>
+              {formatTime(timeLeft)}
+            </span>
+          </div>
+
+          <div className="hidden md:block h-8 w-px bg-white/10" />
+
+          <div className="hidden md:flex flex-col w-56">
+            <div className="flex justify-between text-[10px] text-slate-400 mb-1 font-mono">
+              <span>PROGRESS</span>
+              <span>{Math.round(progressPct)}%</span>
+            </div>
+            <div className="h-1.5 bg-slate-800 rounded-full overflow-hidden">
+              <motion.div className={`h-full ${theme.bar}`} animate={{ width: `${progressPct}%` }} />
+            </div>
+            <div className="mt-1 text-[10px] text-slate-500 font-mono uppercase tracking-widest">
+              Answered: {answeredCount}/{activeQuestions.length}
+            </div>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-4">
+          <button
+            onClick={toggleFlag}
+            className={`px-3 py-1.5 rounded border text-xs font-bold transition-all flex items-center gap-2 ${
+              flags.has(currentIdx)
+                ? "bg-yellow-500/20 border-yellow-500 text-yellow-400"
+                : "border-white/10 text-slate-400 hover:text-white"
+            }`}
+          >
+            <svg width="12" height="12" viewBox="0 0 24 24" fill={flags.has(currentIdx) ? "currentColor" : "none"} stroke="currentColor" strokeWidth="3">
+              <path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z" />
+              <line x1="4" y1="22" x2="4" y2="15" />
+            </svg>
+            FLAG
+          </button>
+
+          <button
+            onClick={handleSubmit}
+            className="px-4 py-2 bg-red-500/10 text-red-400 text-xs font-bold rounded border border-red-500/20 hover:bg-red-500/20"
+          >
+            SUBMIT EXAM
+          </button>
+        </div>
+      </header>
+
+      {/* Main Question Area */}
+      <main className="flex-1 max-w-4xl mx-auto w-full p-6 flex flex-col justify-center relative z-10">
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={currentIdx}
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -20 }}
+            transition={{ duration: 0.2 }}
+          >
+            <div className="flex items-center justify-between mb-6">
+              <div className="px-3 py-1 rounded bg-slate-800/50 border border-white/10 text-[10px] font-bold tracking-widest text-slate-400 uppercase">
+                Question {currentIdx + 1} of {activeQuestions.length}
+              </div>
+              <div className="text-[10px] font-mono text-slate-500 uppercase tracking-widest">
+                ID: {currentQ.id ?? "GEN-001"}
+              </div>
+            </div>
+
+            <h2 className="text-xl md:text-2xl font-medium leading-relaxed mb-8 text-slate-100">
+              {currentQ.text}
+            </h2>
+
+            <div className="space-y-3">
+              {currentQ.options.map((option, idx) => {
+                const isSelected = answers[currentIdx] === idx;
+                return (
+                  <button
+                    key={idx}
+                    onClick={() => handleSelect(idx)}
+                    className={`w-full text-left p-5 rounded-xl border transition-all duration-150 flex items-center gap-4 group ${
+                      isSelected
+                        ? `${theme.selection} ${theme.glow} shadow-lg`
+                        : "border-white/10 bg-white/5 hover:border-white/20 hover:bg-white/10"
+                    }`}
+                  >
+                    <div
+                      className={`w-6 h-6 rounded flex items-center justify-center text-[10px] font-bold border transition-colors ${
+                        isSelected
+                          ? (isP ? "border-rose-500 bg-rose-500 text-white" : "border-cyan-400 bg-cyan-400 text-black")
+                          : "border-slate-600 text-slate-500 group-hover:border-slate-400 group-hover:text-slate-300"
+                      }`}
+                    >
+                      {String.fromCharCode(65 + idx)}
+                    </div>
+                    <span className={`text-base md:text-lg ${isSelected ? "text-white font-medium" : "text-slate-300"}`}>
+                      {option}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </motion.div>
+        </AnimatePresence>
+      </main>
+
+      {/* Footer Nav */}
+      <footer className="p-4 md:p-6 border-t border-white/5 bg-slate-950/50 backdrop-blur-sm flex justify-between items-center sticky bottom-0 z-30">
+        <button
+          onClick={handlePrev}
+          disabled={currentIdx === 0}
+          className={`flex items-center gap-2 px-6 py-3 rounded-lg text-xs font-bold uppercase tracking-widest transition-colors ${
+            currentIdx === 0 ? "text-slate-600 cursor-not-allowed" : "text-slate-300 hover:bg-white/5 hover:text-white"
+          }`}
+        >
+          ← Previous
+        </button>
+
+        {/* Question Map (Desktop Only) */}
+        <div className="hidden md:flex gap-1 overflow-x-auto max-w-md px-4 no-scrollbar">
+          {activeQuestions.map((_, i) => (
+            <button
+              key={i}
+              onClick={() => setCurrentIdx(i)}
+              className={`w-1.5 h-6 rounded-full transition-all ${
+                i === currentIdx
+                  ? "bg-white scale-125"
+                  : flags.has(i)
+                    ? "bg-yellow-500"
+                    : answers[i] !== undefined
+                      ? (isP ? "bg-rose-500/50" : "bg-cyan-500/50")
+                      : "bg-slate-800"
+              }`}
+              aria-label={`Jump to question ${i + 1}`}
+            />
+          ))}
+        </div>
+
+        <button
+          onClick={currentIdx + 1 === activeQuestions.length ? handleSubmit : handleNext}
+          disabled={answers[currentIdx] === undefined}
+          className={`flex items-center gap-2 px-8 py-3 rounded-lg text-xs font-bold uppercase tracking-widest shadow-lg transition-all ${
+            answers[currentIdx] === undefined
+              ? "bg-slate-800 text-slate-500 cursor-not-allowed"
+              : `${theme.btn} text-white`
+          }`}
+        >
+          {currentIdx + 1 === activeQuestions.length ? "Finish Exam" : "Next"} →
+        </button>
+      </footer>
+    </div>
+  );
+}
+
+function BriefingRow({ icon, title, sub }: { icon: string; title: string; sub: string }) {
+  return (
+    <div className="flex items-center gap-4 p-4 bg-white/5 rounded-xl border border-white/5 hover:border-white/10 transition-colors">
+      <div className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center text-xl">{icon}</div>
+      <div>
+        <h3 className="font-bold text-white text-sm">{title}</h3>
+        <p className="text-xs text-slate-400">{sub}</p>
+      </div>
+    </div>
+  );
+}
