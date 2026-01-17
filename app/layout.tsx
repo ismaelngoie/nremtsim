@@ -5,8 +5,8 @@ import "./globals.css";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "NREMT Clinical OS",
-  description: "Advanced Logic Simulator for Pre-Hospital Providers",
+  title: "NREMT",
+  description: "NREMT Prep test",
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
