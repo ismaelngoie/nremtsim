@@ -1,69 +1,387 @@
 "use client";
 
 import Dock from "@/components/Dock";
-import Link from "next/link";
-import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { useEffect, useMemo, useState } from "react";
+import { motion } from "framer-motion";
+
+// --- Types ---
+type Level = "EMT" | "Paramedic";
+
+type Stats = {
+  drillsRun: number;
+  mastery: number;
+  daysActive: number;
+};
+
+function safeJSON<T>(raw: string | null, fallback: T): T {
+  try {
+    return raw ? (JSON.parse(raw) as T) : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+function normalizeLevel(x: unknown): Level {
+  return x === "Paramedic" ? "Paramedic" : "EMT";
+}
 
 export default function ProfilePage() {
-  const [level, setLevel] = useState("EMT");
+  const router = useRouter();
 
-  useEffect(() => {
-    setLevel(localStorage.getItem("userLevel") || "EMT");
+  // --- State ---
+  const [level, setLevel] = useState<Level>("EMT");
+  const [name, setName] = useState("FUTURE MEDIC");
+  const [editName, setEditName] = useState(false);
+  const [nameDraft, setNameDraft] = useState("FUTURE MEDIC");
+  const [stats, setStats] = useState<Stats>({ drillsRun: 0, mastery: 0, daysActive: 1 });
+
+  // --- Theme Engine ---
+  const isP = level === "Paramedic";
+  const theme = useMemo(
+    () => ({
+      bg: isP ? "bg-[#0B1022]" : "bg-[#0F172A]",
+      accent: isP ? "text-rose-500" : "text-cyan-500",
+      border: isP ? "border-rose-500/30" : "border-cyan-500/30",
+      cardBorder: isP ? "border-rose-500" : "border-cyan-500",
+      softBg: isP ? "bg-rose-500/10" : "bg-cyan-500/10",
+      icon: isP ? "⚡️" : "🚑",
+      chipText: isP ? "text-rose-200" : "text-cyan-200",
+    }),
+    [isP]
+  );
+
+  // Freeze expiry date per mount (prevents “changing” if user sits on the page)
+  const dateString = useMemo(() => {
+    const expDate = new Date();
+    expDate.setFullYear(expDate.getFullYear() + 2);
+    return expDate.toLocaleDateString("en-US", { month: "2-digit", year: "2-digit" });
   }, []);
 
-  const toggleLevel = () => {
-    const newLevel = level === "EMT" ? "Paramedic" : "EMT";
+  // --- Init ---
+  useEffect(() => {
+    const storedLevel = normalizeLevel(localStorage.getItem("userLevel"));
+    const storedName = localStorage.getItem("userName") || "FUTURE MEDIC";
+
+    setLevel(storedLevel);
+    setName(storedName);
+    setNameDraft(storedName);
+
+    // Stats
+    const mastered = safeJSON<number[]>(localStorage.getItem("mastered-ids"), []);
+    const shiftHistory = safeJSON<string[]>(localStorage.getItem("shift-history"), []);
+
+    const uniqueDays = new Set(
+      shiftHistory
+        .filter((x) => typeof x === "string" && x.length > 0)
+        .map((x) => x.trim())
+    );
+
+    setStats({
+      drillsRun: shiftHistory.length, // this is “drills” (shifts), not “full sims”
+      mastery: mastered.length,
+      daysActive: Math.max(1, uniqueDays.size),
+    });
+  }, []);
+
+  // --- Actions ---
+  const toggleLevel = (newLevel: Level) => {
+    if (newLevel === level) return;
     localStorage.setItem("userLevel", newLevel);
     setLevel(newLevel);
-    alert(`Switched to ${newLevel} Protocols. Your dashboard has been updated.`);
+  };
+
+  const saveName = () => {
+    const cleaned = nameDraft.trim().slice(0, 32) || "FUTURE MEDIC";
+    localStorage.setItem("userName", cleaned);
+    setName(cleaned);
+    setNameDraft(cleaned);
+    setEditName(false);
+  };
+
+  const cancelName = () => {
+    setNameDraft(name);
+    setEditName(false);
+  };
+
+  const exportData = async () => {
+    // Only export your app’s keys (not everything in localStorage)
+    const keys = [
+      "userLevel",
+      "userName",
+      "shift-history",
+      "last-shift-date",
+      "last-shift-result",
+      "category-performance",
+      "mastered-ids",
+      "readinessScore",
+      "weakestDomain",
+      "weakestDomainPct",
+      "domainBreakdown",
+      "diagnosticAnswers",
+      "exam-date",
+    ];
+
+    const payload: Record<string, unknown> = {};
+    for (const k of keys) payload[k] = safeJSON(localStorage.getItem(k), localStorage.getItem(k));
+
+    const text = JSON.stringify(payload, null, 2);
+    try {
+      await navigator.clipboard.writeText(text);
+      alert("Export copied to clipboard.");
+    } catch {
+      // fallback
+      alert("Could not copy automatically. (Clipboard blocked)");
+      console.log(text);
+    }
+  };
+
+  const handleReset = () => {
+    if (!confirm("WARNING: This will wipe progress + history. This cannot be undone.")) return;
+
+    // Remove only app keys (production-safe)
+    const keysToRemove = [
+      "shift-history",
+      "last-shift-date",
+      "last-shift-result",
+      "category-performance",
+      "mastered-ids",
+      "readinessScore",
+      "weakestDomain",
+      "weakestDomainPct",
+      "statusLabel",
+      "passProbability",
+      "confidenceLow",
+      "confidenceHigh",
+      "domainBreakdown",
+      "diagnosticAnswers",
+      "exam-date",
+      "daysToExam",
+    ];
+    keysToRemove.forEach((k) => localStorage.removeItem(k));
+
+    // Keep identity, but refresh UI
+    setStats({ drillsRun: 0, mastery: 0, daysActive: 1 });
+    router.replace("/dashboard");
   };
 
   return (
-    <div className="min-h-screen bg-[#0F172A] text-white pb-32 p-6">
-      
-      <header className="mb-8 mt-4">
-        <h1 className="text-2xl font-black text-white">OPERATOR PROFILE</h1>
-        <p className="text-gray-500 text-sm font-mono">ID: 8492-ALPHA • {level}</p>
+    <div className={`min-h-screen ${theme.bg} text-white pb-32 font-sans relative overflow-x-hidden`}>
+      {/* Background FX */}
+      <div
+        className={`fixed -top-40 -right-40 w-96 h-96 ${
+          isP ? "bg-rose-600/10" : "bg-cyan-500/10"
+        } blur-[100px] rounded-full pointer-events-none`}
+      />
+
+      <header className="px-6 pt-8 pb-4">
+        <h1 className="text-3xl font-black text-white tracking-tight">Identity</h1>
+        <p className="text-slate-400 text-xs font-mono uppercase tracking-widest mt-1">
+          Personnel Management
+        </p>
       </header>
 
-      <div className="bg-gradient-to-br from-blue-900/20 to-slate-900 border border-blue-500/30 p-6 rounded-2xl mb-6 relative overflow-hidden">
-        <div className="absolute top-0 right-0 p-4">
-          <div className="bg-green-500 text-black text-[10px] font-bold px-2 py-1 rounded">ACTIVE</div>
+      <main className="px-4 space-y-6 max-w-md mx-auto">
+        {/* 1. THE ID CARD (Hero Visual) */}
+        <motion.div
+          initial={{ y: 20, opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          className={`relative bg-white rounded-2xl p-6 shadow-2xl overflow-hidden text-black transform transition-all duration-500 border-t-4 ${theme.cardBorder}`}
+        >
+          {/* Holographic Sheen */}
+          <div className="absolute inset-0 bg-gradient-to-br from-transparent via-white/40 to-transparent opacity-50 pointer-events-none" />
+
+          <div className="flex justify-between items-start mb-6">
+            <div>
+              <p className="text-[10px] font-black tracking-widest text-gray-400 uppercase">Credential</p>
+              <div className={`h-1 w-8 mt-1 ${isP ? "bg-rose-500" : "bg-blue-500"}`} />
+            </div>
+            <div className="text-right">
+              <span className="text-xs font-bold text-gray-400 block">EXPIRY</span>
+              <span className="text-lg font-black text-gray-800">{dateString}</span>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-4 mb-6 relative z-10">
+            <div
+              className={`w-16 h-16 rounded-xl flex items-center justify-center text-3xl border-2 bg-gray-50 ${
+                isP ? "border-rose-100 text-rose-500" : "border-blue-100 text-blue-500"
+              }`}
+              aria-hidden="true"
+            >
+              {theme.icon}
+            </div>
+            <div className="min-w-0">
+              <div className="flex items-center gap-2">
+                <h2 className="text-xl font-black tracking-tight leading-none uppercase truncate">{name}</h2>
+
+                <button
+                  onClick={() => setEditName(true)}
+                  className="text-[10px] px-2 py-1 rounded bg-black/10 hover:bg-black/15 font-bold uppercase tracking-widest"
+                >
+                  Edit
+                </button>
+              </div>
+              <p className={`text-xs font-black uppercase mt-1 ${theme.accent}`}>{level} CERTIFIED</p>
+            </div>
+          </div>
+
+          <div className="flex justify-between items-end border-t border-gray-100 pt-4">
+            <div className="text-[10px] text-gray-400 font-mono">
+              ID: 8492-ALPHA
+              <br />
+              REGION: US-NREMT
+            </div>
+            {/* Barcode Mock */}
+            <div className="flex gap-0.5 h-6 opacity-60" aria-hidden="true">
+              {[...Array(12)].map((_, i) => (
+                <div key={i} className={`bg-black ${i % 3 === 0 ? "w-1" : "w-0.5"}`} />
+              ))}
+            </div>
+          </div>
+        </motion.div>
+
+        {/* Name Editor */}
+        <AnimatePresence>
+          {editName && (
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 10 }}
+              className="rounded-2xl bg-slate-900/55 border border-white/10 p-4"
+            >
+              <div className="text-xs font-black uppercase tracking-widest text-slate-400 mb-2">
+                Operator Name
+              </div>
+
+              <input
+                value={nameDraft}
+                onChange={(e) => setNameDraft(e.target.value)}
+                className="w-full bg-black/30 border border-white/10 rounded-xl px-3 py-3 text-sm text-white outline-none focus:border-white/20"
+                placeholder="FUTURE MEDIC"
+                maxLength={32}
+              />
+
+              <div className="mt-3 grid grid-cols-2 gap-2">
+                <button
+                  onClick={saveName}
+                  className={`py-3 rounded-xl font-black text-sm border ${theme.border} ${theme.softBg} ${theme.chipText}`}
+                >
+                  SAVE
+                </button>
+                <button
+                  onClick={cancelName}
+                  className="py-3 rounded-xl font-black text-sm bg-white/5 border border-white/10 hover:bg-white/10"
+                >
+                  CANCEL
+                </button>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* 2. MODE SWITCHER */}
+        <section>
+          <h3 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-3 px-2">
+            Operational Protocol
+          </h3>
+
+          <div className="bg-slate-900 border border-white/10 p-1.5 rounded-2xl flex relative">
+            <motion.div
+              layout
+              className={`absolute top-1.5 bottom-1.5 w-[calc(50%-6px)] rounded-xl ${theme.softBg} border ${theme.border} shadow-lg z-0`}
+              animate={{ x: isP ? "100%" : "0%" }}
+              transition={{ type: "spring", bounce: 0.2, duration: 0.4 }}
+            />
+
+            <button
+              onClick={() => toggleLevel("EMT")}
+              className={`flex-1 relative z-10 py-3 text-sm font-bold transition-colors focus:outline-none ${
+                !isP ? "text-cyan-400" : "text-slate-500 hover:text-slate-300"
+              }`}
+            >
+              EMT (BLS)
+            </button>
+
+            <button
+              onClick={() => toggleLevel("Paramedic")}
+              className={`flex-1 relative z-10 py-3 text-sm font-bold transition-colors focus:outline-none ${
+                isP ? "text-rose-400" : "text-slate-500 hover:text-slate-300"
+              }`}
+            >
+              PARAMEDIC (ALS)
+            </button>
+          </div>
+
+          <p className="text-[10px] text-slate-500 mt-2 px-2">
+            Switching modes recalibrates the simulator and station drill pool.
+          </p>
+        </section>
+
+        {/* 3. SERVICE RECORD */}
+        <section>
+          <h3 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-3 px-2">
+            Service Record
+          </h3>
+
+          <div className="grid grid-cols-3 gap-3">
+            <div className="bg-slate-900/50 border border-white/5 p-3 rounded-xl text-center">
+              <div className="text-xl font-black text-white">{stats.drillsRun}</div>
+              <div className="text-[9px] text-slate-500 uppercase font-bold">Drills Run</div>
+            </div>
+
+            <div className="bg-slate-900/50 border border-white/5 p-3 rounded-xl text-center">
+              <div className="text-xl font-black text-white">{stats.mastery}</div>
+              <div className="text-[9px] text-slate-500 uppercase font-bold">Items Mastered</div>
+            </div>
+
+            <div className="bg-slate-900/50 border border-white/5 p-3 rounded-xl text-center">
+              <div className={`text-xl font-black ${theme.accent}`}>{stats.daysActive}</div>
+              <div className="text-[9px] text-slate-500 uppercase font-bold">Days Active</div>
+            </div>
+          </div>
+        </section>
+
+        {/* 4. DATA CONTROLS */}
+        <section className="space-y-3">
+          <button
+            onClick={exportData}
+            className="w-full bg-slate-900/50 border border-white/5 p-4 rounded-xl flex items-center justify-between hover:bg-white/5 transition-colors"
+          >
+            <div className="flex items-center gap-3">
+              <div className={`w-8 h-8 rounded-full ${theme.softBg} flex items-center justify-center text-lg`}>
+                ⛭
+              </div>
+              <div className="text-left">
+                <div className="text-sm font-bold text-white">Export Data</div>
+                <div className="text-[10px] text-slate-400">Copies your progress JSON</div>
+              </div>
+            </div>
+            <div className="text-slate-500">→</div>
+          </button>
+
+          <button
+            onClick={handleReset}
+            className="w-full bg-red-900/10 border border-red-500/20 p-4 rounded-xl flex items-center justify-between hover:bg-red-900/20 transition-colors"
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 rounded-full bg-red-500/10 flex items-center justify-center text-red-500 text-lg">
+                ⚠️
+              </div>
+              <div className="text-left">
+                <div className="text-sm font-bold text-red-400">Factory Reset</div>
+                <div className="text-[10px] text-red-400/60">Wipe progress + history keys</div>
+              </div>
+            </div>
+          </button>
+        </section>
+
+        <div className="text-center pt-6 pb-2">
+          <p className="text-[10px] text-slate-600 font-mono">
+            NREMT SIM OS • {isP ? "ALS" : "BLS"} BUILD
+          </p>
         </div>
-        <h3 className="text-gray-400 text-xs font-bold uppercase tracking-widest mb-1">Status</h3>
-        <h2 className="text-xl font-bold text-white mb-4">NREMT OS: PRO</h2>
-        <button className="text-xs bg-white/10 hover:bg-white/20 px-4 py-2 rounded-lg font-bold transition-colors">
-          Manage Subscription
-        </button>
-      </div>
-
-      <div className="space-y-4">
-        {/* PROFESSION SWITCHER */}
-        <button onClick={toggleLevel} className="w-full bg-slate-900/50 border border-white/5 p-4 rounded-xl flex justify-between items-center group">
-          <div className="text-left">
-            <span className="text-sm font-medium block text-white">Certification Level</span>
-            <span className="text-xs text-blue-400 font-bold">{level} (Tap to Switch)</span>
-          </div>
-          <div className="w-10 h-6 bg-slate-700 rounded-full relative group-hover:bg-blue-600 transition-colors">
-            <div className={`absolute top-1 w-4 h-4 bg-white rounded-full shadow-md transition-all ${level === "Paramedic" ? "right-1" : "left-1"}`} />
-          </div>
-        </button>
-
-        <div className="bg-slate-900/50 border border-white/5 p-4 rounded-xl flex justify-between items-center">
-          <span className="text-sm font-medium">Notifications</span>
-          <div className="w-10 h-6 bg-green-600 rounded-full relative">
-            <div className="absolute right-1 top-1 w-4 h-4 bg-white rounded-full shadow-md" />
-          </div>
-        </div>
-
-        <Link href="/" onClick={() => localStorage.clear()} className="block bg-red-900/20 border border-red-500/20 p-4 rounded-xl text-center text-red-400 font-bold text-sm">
-          Reset All Data
-        </Link>
-      </div>
-
-      <div className="mt-12 text-center">
-        <p className="text-[10px] text-gray-700 font-mono">NREMT SIM OS v1.2.0</p>
-      </div>
+      </main>
 
       <Dock />
     </div>
