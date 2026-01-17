@@ -192,7 +192,7 @@ function PaywallContent() {
   async function handleRestore() {
     const email = restoreEmail.trim().toLowerCase();
     if (!email.includes("@")) {
-      setRestoreMsg("Type the same email you paid with.");
+      setRestoreMsg("Type the same email you paid with in the box.");
       return;
     }
 
@@ -243,7 +243,7 @@ function PaywallContent() {
           <div className="mb-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 p-4">
             <div className="text-sm font-black text-emerald-200">✅ Payment Complete</div>
             <div className="mt-1 text-sm text-slate-200">
-              Type the <b>same email</b> you paid with in the Restore box at the bottom.
+              Type the <b>same email</b> you paid with in the box.
             </div>
           </div>
         )}
@@ -525,7 +525,7 @@ function PaywallContent() {
           </div>
 
           <p className="mt-2 text-sm text-slate-300 leading-relaxed">
-            Type the <b>same email</b> you paid with in the Restore box at the bottom.
+            Type the <b>same email</b> you paid with in the box.
           </p>
 
           <div className="mt-3 flex gap-2">
