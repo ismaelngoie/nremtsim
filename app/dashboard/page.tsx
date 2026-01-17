@@ -8,8 +8,8 @@ import { useState, useEffect } from "react";
 import { questions } from "@/lib/questions";
 
 export default function Dashboard() {
-  const [streak, setStreak] = useState([false, false, false, false, false, false, false]);
-  const [readiness, setReadiness] = useState(42); // Default baseline
+  const [streakDays, setStreakDays] = useState<{day: string, active: boolean}[]>([]);
+  const [readiness, setReadiness] = useState(42); 
   const [shiftComplete, setShiftComplete] = useState(false);
 
   useEffect(() => {
@@ -17,28 +17,22 @@ export default function Dashboard() {
     const mastered = JSON.parse(localStorage.getItem("mastered-ids") || "[]");
     const totalQ = questions.length;
     if (totalQ > 0 && mastered.length > 0) {
-      // Scale it so it doesn't look sad (min 40%, max 100%)
       const realPercent = (mastered.length / totalQ) * 100;
-      setReadiness(Math.min(100, Math.round(40 + (realPercent * 0.6))));
+      setReadiness(Math.min(100, Math.round(42 + (realPercent * 0.6))));
     }
 
-    // 2. Calculate Weekly Streak
-    const today = new Date().getDay(); // 0 (Sun) - 6 (Sat)
-    // Convert to Mon-Sun (0-6) where 0 is Mon
-    const dayIndex = today === 0 ? 6 : today - 1;
-    
-    // In a real app, we'd store dates. For demo, we just fill up to today if they did a shift
+    // 2. Logic for Weekly Calendar (M T W T F S S)
+    const days = ["M", "T", "W", "T", "F", "S", "S"];
+    const todayIndex = new Date().getDay() === 0 ? 6 : new Date().getDay() - 1; // 0=Mon, 6=Sun
     const lastShiftDate = localStorage.getItem("last-shift-date");
     const isTodayDone = lastShiftDate === new Date().toDateString();
     setShiftComplete(isTodayDone);
 
-    // Fake visual logic: Fill previous days as 'done' for the vibe, current day depends on status
-    const newStreak = Array(7).fill(false).map((_, i) => {
-      if (i < dayIndex) return true; // Past days
-      if (i === dayIndex) return isTodayDone; // Today
-      return false; // Future
-    });
-    setStreak(newStreak);
+    const newStreak = days.map((d, i) => ({
+      day: d,
+      active: i === todayIndex ? isTodayDone : (i < todayIndex) // Past days filled for demo, Future empty
+    }));
+    setStreakDays(newStreak);
 
   }, []);
 
@@ -64,38 +58,40 @@ export default function Dashboard() {
       <main className="p-4 space-y-4 max-w-lg mx-auto">
         
         {/* A. The Anatomy Centerpiece */}
-        <section className="relative h-[380px] flex items-center justify-center">
+        <section className="relative h-[320px] flex items-center justify-center">
           <div className="absolute top-0 left-0 w-full flex justify-between px-4 z-20">
             <div className="text-[10px] text-gray-600 font-mono">
               ID: 8492-A<br/>
-              LOC: TAMPA, FL
+              REGION: US-NREMT
             </div>
             <div className="text-[10px] text-gray-600 font-mono text-right">
-              EXAM: NREMT-P<br/>
+              EXAM: PENDING<br/>
               T-MINUS: 14 DAYS
             </div>
           </div>
           <BodyHeatmap />
         </section>
 
-        {/* B. "The Shift" Widget (Moved Up) */}
+        {/* B. "The Shift" Widget (High Priority) */}
         <motion.div 
-          initial={{ y: 20, opacity: 0 }}
-          animate={{ y: 0, opacity: 1 }}
+          initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }}
           className="bg-gradient-to-br from-gray-800/50 to-gray-900/50 border border-white/10 p-5 rounded-2xl relative overflow-hidden group cursor-pointer"
         >
-          <div className="absolute top-0 right-0 p-4 opacity-20 group-hover:opacity-40 transition-opacity">
-            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" className="text-white"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
-          </div>
-          
           <div className="flex justify-between items-start mb-4">
             <div>
               <h3 className="text-gray-400 text-xs font-bold uppercase tracking-widest mb-1">Daily Task</h3>
               <h2 className="text-xl font-bold text-white">{shiftComplete ? "Shift Complete" : "Start Your Shift"}</h2>
             </div>
-            <div className="flex gap-1">
-              {streak.map((done, i) => (
-                <div key={i} className={`w-1.5 h-6 rounded-full ${done ? "bg-green-500" : "bg-gray-700/50"}`} />
+            
+            {/* WEEKLY CALENDAR DOTS */}
+            <div className="flex gap-2">
+              {streakDays.map((item, i) => (
+                <div key={i} className="flex flex-col items-center gap-1">
+                  <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[9px] font-bold ${item.active ? "bg-green-500 text-black" : "bg-white/10 text-gray-500"}`}>
+                    {item.active ? "✓" : ""}
+                  </div>
+                  <span className="text-[9px] text-gray-600 font-mono">{item.day}</span>
+                </div>
               ))}
             </div>
           </div>
@@ -108,21 +104,15 @@ export default function Dashboard() {
 
         {/* C. Critical Weakness Alert */}
         <motion.div 
-          initial={{ y: 20, opacity: 0 }}
-          animate={{ y: 0, opacity: 1 }}
-          transition={{ delay: 0.1 }}
+          initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.1 }}
           className="bg-red-900/10 border border-red-500/30 p-5 rounded-2xl flex items-center gap-4"
         >
-          <div className="w-10 h-10 rounded-full bg-red-500/20 flex items-center justify-center text-red-400 animate-pulse">
-            !
-          </div>
+          <div className="w-10 h-10 rounded-full bg-red-500/20 flex items-center justify-center text-red-400 animate-pulse">!</div>
           <div>
             <h3 className="text-white font-bold text-sm">Critical Flag: Cardiology</h3>
             <p className="text-red-400/80 text-xs">Recommended: Review ACS Protocols.</p>
           </div>
-          <Link href="/station?category=Cardiology" className="ml-auto text-xs bg-red-600 hover:bg-red-500 text-white px-4 py-2 rounded-lg font-bold transition-colors">
-            FIX
-          </Link>
+          <Link href="/station?category=Cardiology" className="ml-auto text-xs bg-red-600 hover:bg-red-500 text-white px-4 py-2 rounded-lg font-bold transition-colors">FIX</Link>
         </motion.div>
 
       </main>
