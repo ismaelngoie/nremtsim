@@ -4,8 +4,7 @@ import Dock from "@/components/Dock";
 import BodyHeatmap from "@/components/BodyHeatmap";
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { useEffect, useMemo, useCallback, useState } from "react";
-import { useSearchParams } from "next/navigation";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 type Level = "EMT" | "Paramedic";
 
@@ -74,16 +73,9 @@ function daysUntil(dateISO: string) {
   return Math.ceil(diff / (1000 * 60 * 60 * 24));
 }
 
-/**
- * Production: normalize performance storage from different shapes:
- * - Record<string, number>
- * - Record<string, {last/best/avg/attempts}>
- * - Array<{category, score|accuracy, attempts?}>
- */
 function normalizePerf(raw: unknown): PerfMap {
   const out: PerfMap = {};
 
-  // Array form
   if (Array.isArray(raw)) {
     for (const item of raw) {
       if (!item || typeof item !== "object") continue;
@@ -95,6 +87,7 @@ function normalizePerf(raw: unknown): PerfMap {
       const s = clamp(Math.round(score));
       const attempts = Number(anyItem.attempts);
       const a = Number.isFinite(attempts) && attempts > 0 ? Math.floor(attempts) : 1;
+
       out[category] = {
         attempts: a,
         last: s,
@@ -106,7 +99,6 @@ function normalizePerf(raw: unknown): PerfMap {
     return out;
   }
 
-  // Record form
   if (raw && typeof raw === "object") {
     const obj = raw as Record<string, any>;
     for (const [categoryRaw, val] of Object.entries(obj)) {
@@ -127,6 +119,7 @@ function normalizePerf(raw: unknown): PerfMap {
         const a = Number.isFinite(attempts) && attempts > 0 ? Math.floor(attempts) : 1;
         const best = Number(val.best);
         const avg = Number(val.avg);
+
         out[category] = {
           attempts: a,
           last: l,
@@ -145,17 +138,12 @@ function readFirstExistingJSON<T>(keys: string[], fallback: T): T {
   for (const k of keys) {
     const raw = typeof window !== "undefined" ? localStorage.getItem(k) : null;
     if (!raw) continue;
-    const parsed = safeJSON<T>(raw, fallback);
-    // if it parsed into fallback but raw exists, still return parsed (could be empty)
-    return parsed;
+    return safeJSON<T>(raw, fallback);
   }
   return fallback;
 }
 
 export default function Dashboard() {
-  const params = useSearchParams();
-  const urlPlan = params.get("plan"); // "annual" | "monthly" | "lifetime" | null
-
   const [plan, setPlan] = useState<string | null>(null);
 
   const [level, setLevel] = useState<Level>("EMT");
@@ -217,8 +205,7 @@ export default function Dashboard() {
   const ROUTES = useMemo(
     () => ({
       drill: `/station?category=${encodeURIComponent(weakDomain)}`,
-      // IMPORTANT: you asked for /simulator (not /sim)
-      simulator: "/simulator",
+      simulator: "/simulator", // you requested this path
       paywall: "/pay",
       review: `/station?mode=review&category=${encodeURIComponent(weakDomain)}`,
     }),
@@ -251,10 +238,10 @@ export default function Dashboard() {
     const set = new Set(existing);
     set.add(todayStr);
     localStorage.setItem("shift-history", JSON.stringify(Array.from(set)));
-    localStorage.setItem("last-shift-date", todayStr); // keep legacy in sync
+    localStorage.setItem("last-shift-date", todayStr);
+
     setShiftComplete(true);
 
-    // update dots immediately (so it fills instantly)
     const last7 = getLast7Dates();
     const dots: DayDot[] = last7.map((d) => ({
       day: dayLetter(d),
@@ -327,8 +314,7 @@ export default function Dashboard() {
       if (Number.isFinite(dte) && dte >= 0 && dte <= 365) setDaysToExam(Math.round(dte));
     }
 
-    // Performance:
-    // Try multiple keys (in case your station/sim uses a different name)
+    // Performance
     const perfKeys = [
       "category-performance",
       "categoryPerformance",
@@ -341,17 +327,10 @@ export default function Dashboard() {
     const rawPerf = readFirstExistingJSON<unknown>(perfKeys, {});
     let perfMap = normalizePerf(rawPerf);
 
-    // Merge last result if you store it
-    const lastResultKeys = [
-      "last-shift-result",
-      "lastShiftResult",
-      "lastDrillResult",
-      "stationLastResult",
-      "last-session-result",
-    ];
+    // Merge last result if present
+    const lastResultKeys = ["last-shift-result", "lastShiftResult", "lastDrillResult", "stationLastResult", "last-session-result"];
     const lastRes = readFirstExistingJSON<any>(lastResultKeys, null);
 
-    // Expected shape: { category: string, score: number }
     if (lastRes && typeof lastRes === "object") {
       const cat = String(lastRes.category || lastRes.domain || "").trim();
       const scoreNum = Number(lastRes.score ?? lastRes.accuracy ?? lastRes.value);
@@ -359,15 +338,12 @@ export default function Dashboard() {
         const score = clamp(Math.round(scoreNum));
         const existing = perfMap[cat];
 
-        // Only update if new or changed
         if (!existing || existing.last !== score) {
           const attempts = existing ? existing.attempts + 1 : 1;
           const best = existing ? Math.max(existing.best, score) : score;
           const avg = existing ? clamp(Math.round((existing.avg * existing.attempts + score) / attempts)) : score;
-
           perfMap[cat] = { attempts, last: score, best, avg, updatedAt: Date.now() };
 
-          // Persist back so dashboard stays consistent even if station didn't
           localStorage.setItem("category-performance", JSON.stringify(perfMap));
         }
       }
@@ -379,18 +355,22 @@ export default function Dashboard() {
     computeStreakDots();
   }, [computeStreakDots]);
 
-  // Persist plan
+  // PLAN: read ?plan= from URL on client (no useSearchParams -> no prerender crash)
   useEffect(() => {
     if (typeof window === "undefined") return;
-    if (urlPlan) {
-      setPlan(urlPlan);
-      localStorage.setItem("userPlan", urlPlan);
+
+    const sp = new URLSearchParams(window.location.search);
+    const p = sp.get("plan");
+
+    if (p) {
+      setPlan(p);
+      localStorage.setItem("userPlan", p);
     } else {
       setPlan(localStorage.getItem("userPlan"));
     }
-  }, [urlPlan]);
+  }, []);
 
-  // Initial load + refresh on focus (so perf/streak updates after drill)
+  // Load + refresh on focus/visibility so returning from /station updates dots/perf
   useEffect(() => {
     if (typeof window === "undefined") return;
 
@@ -411,12 +391,8 @@ export default function Dashboard() {
   }, [refreshFromStorage]);
 
   const perfRows = useMemo(() => {
-    const entries = Object.entries(perf).map(([category, v]) => ({
-      category,
-      ...v,
-    }));
+    const entries = Object.entries(perf).map(([category, v]) => ({ category, ...v }));
 
-    // if no drill performance yet, fallback to diagnostic breakdown (still real data)
     if (entries.length === 0 && domainBreakdown.length > 0) {
       return domainBreakdown.slice(0, 6).map((d) => ({
         category: d.category,
@@ -425,29 +401,23 @@ export default function Dashboard() {
         best: clamp(Math.round(d.accuracy)),
         avg: clamp(Math.round(d.accuracy)),
         updatedAt: Date.now(),
-        __fallback: true as const,
       }));
     }
 
-    // sort by last ascending (weakest first) so it screams what to fix
-    return entries
-      .sort((a, b) => a.last - b.last)
-      .slice(0, 6);
+    return entries.sort((a, b) => a.last - b.last).slice(0, 6);
   }, [perf, domainBreakdown]);
 
   return (
     <div className={`min-h-screen ${theme.bg} text-white pb-32 relative overflow-hidden`}>
-      {/* Background grid + glows */}
+      {/* Background */}
       <div className={`fixed inset-0 pointer-events-none ${theme.grid} bg-[length:100%_4px] opacity-20`} />
       <div className="absolute inset-0 pointer-events-none">
-        <div
-          className={`absolute -top-28 left-1/2 -translate-x-1/2 w-[720px] h-[720px] ${theme.glowA} blur-[140px] rounded-full`}
-        />
+        <div className={`absolute -top-28 left-1/2 -translate-x-1/2 w-[720px] h-[720px] ${theme.glowA} blur-[140px] rounded-full`} />
         <div className={`absolute -left-40 top-[30%] w-[560px] h-[560px] ${theme.glowB} blur-[140px] rounded-full`} />
         <div className="absolute -right-40 bottom-[-15%] w-[560px] h-[560px] bg-white/5 blur-[160px] rounded-full" />
       </div>
 
-      {/* Sticky Header */}
+      {/* Header */}
       <header className="relative z-40 p-6 flex justify-between items-end border-b border-white/5 bg-black/10 backdrop-blur-md sticky top-0">
         <div>
           <div className="flex items-center gap-2">
@@ -565,7 +535,7 @@ export default function Dashboard() {
             <div>
               <h3 className="text-slate-400 text-xs font-black uppercase tracking-widest mb-1">Daily Mission</h3>
 
-              {/* requested: Start Your Shift should be red for Paramedic, cyan for EMT */}
+              {/* requested: red for Paramedic / cyan for EMT when not complete */}
               <h2 className={`text-xl font-black leading-tight ${shiftComplete ? "text-white" : theme.accentStrong}`}>
                 {shiftComplete ? "Shift Complete" : "Start Your Shift"}
               </h2>
@@ -575,7 +545,7 @@ export default function Dashboard() {
               </p>
             </div>
 
-            {/* Real 7-day dots */}
+            {/* Real dots */}
             <div className="flex gap-2">
               {streakDays.map((item, i) => (
                 <div key={i} className="flex flex-col items-center gap-1">
@@ -593,7 +563,7 @@ export default function Dashboard() {
           </div>
 
           <div className="grid grid-cols-3 gap-2 mt-4">
-            {/* IMPORTANT: clicking this marks the day as complete immediately */}
+            {/* requested: clicking drill fills today immediately */}
             <Link
               href={ROUTES.drill}
               onClick={() => markShiftToday()}
@@ -603,7 +573,6 @@ export default function Dashboard() {
               {shiftComplete ? "REVIEW DRILL" : "BEGIN 15-MIN DRILL"}
             </Link>
 
-            {/* You asked: full simulator must open /simulator */}
             <Link
               href={ROUTES.simulator}
               className="w-full py-3 rounded-xl font-black text-sm bg-white/5 border border-white/10 hover:bg-white/10 flex items-center justify-center"
@@ -624,7 +593,7 @@ export default function Dashboard() {
           </div>
         </motion.section>
 
-        {/* Performance (fills from real drill scores / last result / fallback diagnostic) */}
+        {/* Performance */}
         <motion.section
           initial={{ y: 16, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
@@ -639,9 +608,7 @@ export default function Dashboard() {
           </div>
 
           {perfRows.length === 0 ? (
-            <div className="mt-3 text-sm text-slate-400">
-              No performance data yet. Start a drill or run a full simulator.
-            </div>
+            <div className="mt-3 text-sm text-slate-400">No performance data yet. Start a drill or run a full simulator.</div>
           ) : (
             <div className="mt-4 space-y-2">
               {perfRows.map((r) => (
@@ -653,7 +620,11 @@ export default function Dashboard() {
                         last {r.last}% • best {r.best}% • avg {r.avg}% • {r.attempts}x
                       </div>
                     </div>
-                    <div className={`text-sm font-black ${r.last >= 80 ? "text-emerald-300" : r.last >= 65 ? "text-yellow-300" : "text-red-300"}`}>
+                    <div
+                      className={`text-sm font-black ${
+                        r.last >= 80 ? "text-emerald-300" : r.last >= 65 ? "text-yellow-300" : "text-red-300"
+                      }`}
+                    >
                       {r.last}%
                     </div>
                   </div>
@@ -667,7 +638,7 @@ export default function Dashboard() {
           )}
         </motion.section>
 
-        {/* Domain Breakdown (diagnostic) */}
+        {/* Domain Breakdown */}
         {domainBreakdown.length > 0 && (
           <motion.section
             initial={{ y: 16, opacity: 0 }}
