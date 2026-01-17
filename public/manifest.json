@@ -1,6 +1,6 @@
 {
-  "name": "NREMT Clinical OS",
-  "short_name": "NREMT Sim",
+  "name": "NREMT",
+  "short_name": "NREMT",
   "start_url": "/dashboard",
   "display": "standalone",
   "background_color": "#0F172A",
