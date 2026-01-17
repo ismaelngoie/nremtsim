@@ -26,7 +26,7 @@ export default function ProfilePage() {
 
   // --- State ---
   const [level, setLevel] = useState<Level>("EMT");
-  const [name, setName] = useState("FUTURE MEDIC");
+  const [name, setName] = useState("FUTURE EMT");
   const [editName, setEditName] = useState(false);
   const [nameDraft, setNameDraft] = useState("FUTURE MEDIC");
   const [stats, setStats] = useState<Stats>({ drillsRun: 0, mastery: 0, daysActive: 1 });
