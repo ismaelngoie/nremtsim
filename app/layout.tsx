@@ -7,13 +7,13 @@ const inter = Inter({ subsets: ["latin"] });
 export const metadata: Metadata = {
   // SEO title (keyword-first)
   title: {
-    default: "NREMT Practice Test (Free) + NREMT Prep Simulator | NREMTS",
-    template: "%s | NREMTS",
+    default: "NREMT Practice Test + NREMT Prep Simulator | NREMTS",
+    template: "%s | NREMT",
   },
 
   // SEO description (keyword + benefit)
   description:
-    "Free NREMT practice test + CAT-style simulator. Get an instant readiness score, detailed rationales, and a focused NREMT prep study plan for EMT & Paramedic.",
+    "NREMT practice test + CAT-style simulator. Get an instant readiness score, detailed rationales, and a focused NREMT prep study plan for EMT & Paramedic.",
 
   // Helps Google understand the topic (lightweight)
   keywords: [
@@ -28,12 +28,20 @@ export const metadata: Metadata = {
   ],
 
   manifest: "/manifest.json",
-  applicationName: "NREMTS",
+
+  // --- ADD THIS SECTION ---
+  icons: {
+    icon: "/icon.png",
+    apple: "/icon.png",
+  },
+  // ------------------------
+  
+  applicationName: "NREMT",
 
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
-    title: "NREMTS",
+    title: "NREMT",
   },
 
   // Social sharing (can be more “hooky” without hurting SEO)
