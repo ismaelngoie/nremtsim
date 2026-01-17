@@ -5,8 +5,7 @@ import BodyHeatmap from "@/components/BodyHeatmap";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import { useEffect, useMemo, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
-import { questions } from "@/lib/questions";
+import { useSearchParams } from "next/navigation";
 
 type Level = "EMT" | "Paramedic";
 
@@ -28,11 +27,12 @@ type DiagnosticAnswer = {
   explanation: string;
 };
 
-type DayDot = { label: string; iso: string; active: boolean };
+type DayDot = { day: string; active: boolean };
 
 function clamp(n: number, min = 0, max = 100) {
   return Math.max(min, Math.min(max, n));
 }
+
 function safeJSON<T>(raw: string | null, fallback: T): T {
   try {
     return raw ? (JSON.parse(raw) as T) : fallback;
@@ -40,206 +40,125 @@ function safeJSON<T>(raw: string | null, fallback: T): T {
     return fallback;
   }
 }
-function normalizeLevel(v: unknown): Level {
-  return v === "Paramedic" ? "Paramedic" : "EMT";
-}
-function todayISO() {
-  const d = new Date();
-  const yyyy = d.getFullYear();
-  const mm = String(d.getMonth() + 1).padStart(2, "0");
-  const dd = String(d.getDate()).padStart(2, "0");
-  return `${yyyy}-${mm}-${dd}`;
-}
-function addDaysISO(base: Date, offsetDays: number) {
-  const d = new Date(base);
-  d.setDate(d.getDate() + offsetDays);
-  const yyyy = d.getFullYear();
-  const mm = String(d.getMonth() + 1).padStart(2, "0");
-  const dd = String(d.getDate()).padStart(2, "0");
-  return `${yyyy}-${mm}-${dd}`;
-}
-function dayLetterFromISO(iso: string) {
-  const d = new Date(`${iso}T00:00:00`);
+
+function dayLetter(d: Date) {
+  // JS getDay: 0=Sun
   const map = ["S", "M", "T", "W", "T", "F", "S"];
   return map[d.getDay()];
 }
-function daysUntil(iso: string) {
-  const target = new Date(`${iso}T00:00:00`).getTime();
-  const now = new Date().getTime();
-  return Math.ceil((target - now) / (1000 * 60 * 60 * 24));
-}
-function statusFromReadiness(readiness: number) {
-  if (readiness >= 80) return { label: "ON TRACK", tone: "text-emerald-300" };
-  if (readiness >= 65) return { label: "BORDERLINE", tone: "text-yellow-300" };
-  return { label: "AT RISK", tone: "text-red-300" };
-}
-// Matches your sim’s behavior (stable small-sample readiness)
-function readinessScoreFromAnswers(correct: number, n: number) {
-  const total = Math.max(1, n);
-  const passProb = (correct + 1) / (total + 2);
-  const score = Math.round(35 + passProb * 60);
-  return clamp(score, 35, 95);
+
+function getLast7Dates() {
+  const today = new Date();
+  const out: Date[] = [];
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date(today);
+    d.setDate(today.getDate() - i);
+    out.push(d);
+  }
+  return out;
 }
 
-export default function DashboardPage() {
-  const router = useRouter();
+function daysUntil(dateISO: string) {
+  const d = new Date(dateISO + "T00:00:00");
+  const diff = d.getTime() - new Date().getTime();
+  return Math.ceil(diff / (1000 * 60 * 60 * 24));
+}
+
+export default function Dashboard() {
   const params = useSearchParams();
+  const urlPlan = params.get("plan"); // "annual" | "monthly" | "lifetime" | null
 
+  // Plan state (persisted)
+  const [plan, setPlan] = useState<string | null>(null);
+
+  // User state
   const [level, setLevel] = useState<Level>("EMT");
   const [userName, setUserName] = useState("FUTURE MEDIC");
 
-  // plan (real): URL param OR localStorage userPlan
-  const [plan, setPlan] = useState<string | null>(null);
-
-  // report fields (real)
-  const [readiness, setReadiness] = useState<number>(0);
+  // Core report fields (from your sim)
+  const [readiness, setReadiness] = useState<number>(42);
+  const [statusLabel, setStatusLabel] = useState<string>("ON DUTY");
   const [weakDomain, setWeakDomain] = useState<string>("General");
   const [weakPct, setWeakPct] = useState<number>(0);
+
+  // Diagnostic extras
   const [passProb, setPassProb] = useState<number | null>(null);
   const [ciLow, setCiLow] = useState<number | null>(null);
   const [ciHigh, setCiHigh] = useState<number | null>(null);
   const [domainBreakdown, setDomainBreakdown] = useState<DomainRow[]>([]);
   const [missed, setMissed] = useState<DiagnosticAnswer | null>(null);
 
-  // progress (real): mastered question ids (optional, but if you store it, it’s real)
-  const [masteredCount, setMasteredCount] = useState(0);
-  const [totalCount, setTotalCount] = useState(0);
+  // Progress (real from your app storage)
+  const [questionsAnswered, setQuestionsAnswered] = useState<number>(0);
 
-  // exam date (real)
-  const [examDate, setExamDate] = useState<string>("");
+  // Exam date
   const [daysToExam, setDaysToExam] = useState<number>(14);
+  const [examDate, setExamDate] = useState<string>("");
   const [showExamSetter, setShowExamSetter] = useState(false);
 
-  // streak (real): shift-history is array of ISO dates "YYYY-MM-DD"
+  // Shift streak (REAL)
   const [streakDays, setStreakDays] = useState<DayDot[]>([]);
   const [shiftComplete, setShiftComplete] = useState(false);
 
-  const isP = level === "Paramedic";
-
-  const theme = useMemo(() => {
-    return {
-      bg: isP ? "bg-[#0B1022]" : "bg-[#0F172A]",
-      accent: isP ? "text-rose-300" : "text-cyan-300",
-      accentStrong: isP ? "text-rose-200" : "text-cyan-200",
-      ring: isP ? "border-rose-400/35" : "border-cyan-400/35",
-      chip: isP ? "bg-rose-500/10 border-rose-500/20" : "bg-cyan-500/10 border-cyan-500/20",
-      chipText: isP ? "text-rose-200" : "text-cyan-200",
-      btnGrad: isP ? "from-rose-600 to-red-500" : "from-blue-600 to-cyan-500",
-      bar: isP ? "bg-rose-500" : "bg-cyan-400",
-      barGlow: isP ? "shadow-[0_0_12px_#f43f5e]" : "shadow-[0_0_12px_#22d3ee]",
-      glowA: isP ? "bg-rose-500/10" : "bg-cyan-500/10",
-      glowB: isP ? "bg-red-600/10" : "bg-blue-600/10",
-      icon: isP ? "⚡️" : "🚑",
-      modeLabel: isP ? "ALS" : "BLS",
-    };
-  }, [isP]);
-
-  const status = useMemo(() => statusFromReadiness(readiness), [readiness]);
-
-  const ROUTES = useMemo(() => {
-    return {
-      sim: "/sim",
-      pay: "/pay",
-      // adjust if your station routes differ
-      drill: `/station?category=${encodeURIComponent(weakDomain)}`,
-      review: `/station?mode=review&category=${encodeURIComponent(weakDomain)}`,
-    };
-  }, [weakDomain]);
-
-  // ---- streak helpers (REAL) ----
-  function loadShiftHistory(): string[] {
-    return safeJSON<string[]>(localStorage.getItem("shift-history"), []);
-  }
-  function saveShiftHistory(arr: string[]) {
-    const unique = Array.from(new Set(arr)).sort(); // stable
-    localStorage.setItem("shift-history", JSON.stringify(unique));
-    return unique;
-  }
-  function recomputeLast7(historyISO: string[]) {
-    const set = new Set(historyISO);
-    const base = new Date();
-    const last7: DayDot[] = [];
-    for (let i = 6; i >= 0; i--) {
-      const iso = addDaysISO(base, -i);
-      last7.push({ iso, label: dayLetterFromISO(iso), active: set.has(iso) });
-    }
-    setStreakDays(last7);
-    const t = todayISO();
-    setShiftComplete(set.has(t));
-  }
-  function logShiftToday() {
-    const t = todayISO();
-    const hist = loadShiftHistory();
-    if (!hist.includes(t)) {
-      const next = saveShiftHistory([...hist, t]);
-      recomputeLast7(next);
-    } else {
-      recomputeLast7(hist);
-    }
-  }
-
-  // ---- init load (REAL) ----
+  // Persist plan from URL -> localStorage (or load existing)
   useEffect(() => {
-    // level + name
-    const lvl = normalizeLevel(localStorage.getItem("userLevel"));
-    setLevel(lvl);
-    setUserName(localStorage.getItem("userName") || "FUTURE MEDIC");
+    if (typeof window === "undefined") return;
 
-    // plan (url param wins)
-    const urlPlan = params.get("plan");
     if (urlPlan) {
       setPlan(urlPlan);
       localStorage.setItem("userPlan", urlPlan);
     } else {
-      const storedPlan = localStorage.getItem("userPlan");
-      setPlan(storedPlan);
+      setPlan(localStorage.getItem("userPlan"));
     }
+  }, [urlPlan]);
 
-    // diagnostic base fields
-    const storedWeak = localStorage.getItem("weakestDomain");
-    if (storedWeak) setWeakDomain(storedWeak);
+  useEffect(() => {
+    if (typeof window === "undefined") return;
 
+    // Level + name
+    const lvl = (localStorage.getItem("userLevel") as Level) || "EMT";
+    const normalized: Level = lvl === "Paramedic" ? "Paramedic" : "EMT";
+    setLevel(normalized);
+    setUserName(localStorage.getItem("userName") || "FUTURE MEDIC");
+
+    // Readiness fields (set by Simulator)
+    const rs = Number(localStorage.getItem("readinessScore"));
+    const wd = localStorage.getItem("weakestDomain");
     const wp = Number(localStorage.getItem("weakestDomainPct"));
+    const sl = localStorage.getItem("statusLabel");
+
+    if (Number.isFinite(rs)) setReadiness(clamp(Math.round(rs)));
+    if (wd) setWeakDomain(wd);
     if (Number.isFinite(wp)) setWeakPct(clamp(Math.round(wp)));
+    if (sl) setStatusLabel(sl);
 
+    // Diagnostic patches
     const pp = Number(localStorage.getItem("passProbability"));
-    if (Number.isFinite(pp)) setPassProb(clamp(Math.round(pp)));
-
     const cl = Number(localStorage.getItem("confidenceLow"));
     const ch = Number(localStorage.getItem("confidenceHigh"));
+    if (Number.isFinite(pp)) setPassProb(clamp(Math.round(pp)));
     if (Number.isFinite(cl)) setCiLow(clamp(Math.round(cl)));
     if (Number.isFinite(ch)) setCiHigh(clamp(Math.round(ch)));
 
-    // domain breakdown (real)
+    // Domain breakdown
     const db = safeJSON<DomainRow[]>(localStorage.getItem("domainBreakdown"), []);
     if (Array.isArray(db) && db.length) {
       const sorted = [...db].sort((a, b) => a.accuracy - b.accuracy);
-      setDomainBreakdown(sorted.slice(0, 8));
+      setDomainBreakdown(sorted.slice(0, 6));
 
       // align weakest if missing
-      if (!storedWeak && sorted[0]?.category) setWeakDomain(sorted[0].category);
+      if (!wd && sorted[0]?.category) setWeakDomain(sorted[0].category);
       if (!Number.isFinite(wp) && typeof sorted[0]?.accuracy === "number") setWeakPct(sorted[0].accuracy);
     }
 
-    // missed question (real)
+    // Missed question (first miss)
     const da = safeJSON<DiagnosticAnswer[]>(localStorage.getItem("diagnosticAnswers"), []);
     if (Array.isArray(da) && da.length) {
       const firstMiss = da.find((a) => a && a.isCorrect === false) || null;
       setMissed(firstMiss);
     }
 
-    // readiness: prefer stored readinessScore, else compute from answers
-    const rs = Number(localStorage.getItem("readinessScore"));
-    if (Number.isFinite(rs)) {
-      setReadiness(clamp(Math.round(rs)));
-    } else if (Array.isArray(da) && da.length) {
-      const correct = da.filter((a) => a.isCorrect).length;
-      setReadiness(readinessScoreFromAnswers(correct, da.length));
-    } else {
-      setReadiness(0);
-    }
-
-    // exam date (real)
+    // Exam date: prefer explicit date, fallback to daysToExam
     const storedExam = localStorage.getItem("exam-date"); // "YYYY-MM-DD"
     if (storedExam) {
       setExamDate(storedExam);
@@ -250,33 +169,60 @@ export default function DashboardPage() {
       if (Number.isFinite(dte) && dte >= 0 && dte <= 365) setDaysToExam(Math.round(dte));
     }
 
-    // progress (real)
-    const mastered = safeJSON<number[]>(localStorage.getItem("mastered-ids"), []);
-    setMasteredCount(Array.isArray(mastered) ? mastered.length : 0);
+    // Progress
+    const masteredIds = safeJSON<string[] | number[]>(localStorage.getItem("mastered-ids"), []);
+    setQuestionsAnswered(Array.isArray(masteredIds) ? masteredIds.length : 0);
 
-    const totalForLevel = questions.filter((q) => q.level === lvl).length;
-    setTotalCount(totalForLevel || questions.length || 0);
+    // Shift history (REAL)
+    const todayStr = new Date().toDateString();
+    const shiftHistory = new Set(safeJSON<string[]>(localStorage.getItem("shift-history"), []));
+    const lastShiftDate = localStorage.getItem("last-shift-date"); // legacy
 
-    // streak (real)
-    const hist = loadShiftHistory();
-    recomputeLast7(hist);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    const todayDone = shiftHistory.has(todayStr) || lastShiftDate === todayStr;
+    setShiftComplete(todayDone);
+
+    const last7 = getLast7Dates();
+    const dots: DayDot[] = last7.map((d) => {
+      const active = shiftHistory.has(d.toDateString());
+      // if legacy only, just show today as done
+      const legacyOnly = shiftHistory.size === 0 && !!lastShiftDate;
+      return {
+        day: dayLetter(d),
+        active: legacyOnly ? d.toDateString() === todayStr && todayDone : active,
+      };
+    });
+    setStreakDays(dots);
   }, []);
 
-  function saveExamDate() {
-    if (!examDate) return;
-    localStorage.setItem("exam-date", examDate);
-    const d = daysUntil(examDate);
-    if (Number.isFinite(d)) setDaysToExam(d);
-    setShowExamSetter(false);
-  }
+  const isP = level === "Paramedic";
 
-  function switchLevel(next: Level) {
-    localStorage.setItem("userLevel", next);
-    setLevel(next);
-    // optional: kick them to sim to regenerate diagnostic in that mode
-    // router.push("/sim");
-  }
+  const theme = useMemo(() => {
+    return {
+      bg: isP ? "bg-[#0B1022]" : "bg-[#0F172A]",
+      accent: isP ? "text-rose-300" : "text-cyan-300",
+      accentStrong: isP ? "text-rose-200" : "text-cyan-200",
+      ring: isP ? "border-rose-400/35" : "border-cyan-400/35",
+      bar: isP ? "bg-rose-500" : "bg-cyan-400",
+      barGlow: isP
+        ? "shadow-[0_0_12px_rgba(244,63,94,0.35)]"
+        : "shadow-[0_0_12px_rgba(34,211,238,0.35)]",
+      btn: isP ? "from-rose-600 to-red-500" : "from-blue-600 to-cyan-500",
+      chip: isP ? "bg-rose-500/10 border-rose-500/20" : "bg-cyan-500/10 border-cyan-500/20",
+      chipText: isP ? "text-rose-200" : "text-cyan-200",
+      glowA: isP ? "bg-rose-500/10" : "bg-cyan-500/10",
+      glowB: isP ? "bg-red-600/10" : "bg-blue-600/10",
+      grid: isP
+        ? "bg-[linear-gradient(transparent_50%,rgba(244,63,94,0.05)_50%)]"
+        : "bg-[linear-gradient(transparent_50%,rgba(34,211,238,0.05)_50%)]",
+      icon: isP ? "⚡️" : "🚑",
+    };
+  }, [isP]);
+
+  const statusTone = useMemo(() => {
+    if (readiness >= 80) return "text-emerald-300";
+    if (readiness >= 65) return "text-yellow-300";
+    return "text-red-300";
+  }, [readiness]);
 
   const nextAction = useMemo(() => {
     if (readiness < 65) return { title: "Fix your weakest domain", sub: `Start ${weakDomain} drills now.` };
@@ -284,108 +230,118 @@ export default function DashboardPage() {
     return { title: "Maintain peak readiness", sub: `Full sim + review misses.` };
   }, [readiness, weakDomain]);
 
+  const saveExamDate = () => {
+    if (!examDate) return;
+    localStorage.setItem("exam-date", examDate);
+    const d = daysUntil(examDate);
+    if (Number.isFinite(d)) setDaysToExam(d);
+    setShowExamSetter(false);
+  };
+
+  // Routes (adjust if needed)
+  const ROUTES = useMemo(
+    () => ({
+      drill: `/station?category=${encodeURIComponent(weakDomain)}`,
+      diagnostic: "/sim",
+      paywall: "/pay",
+      review: `/station?mode=review&category=${encodeURIComponent(weakDomain)}`,
+    }),
+    [weakDomain]
+  );
+
   return (
     <div className={`min-h-screen ${theme.bg} text-white pb-32 relative overflow-hidden`}>
-      {/* Background glows */}
+      {/* Background grid + glows */}
+      <div className={`fixed inset-0 pointer-events-none ${theme.grid} bg-[length:100%_4px] opacity-20`} />
       <div className="absolute inset-0 pointer-events-none">
-        <div className={`absolute -top-28 left-1/2 -translate-x-1/2 w-[740px] h-[740px] ${theme.glowA} blur-[150px] rounded-full`} />
-        <div className={`absolute -left-40 top-[30%] w-[560px] h-[560px] ${theme.glowB} blur-[150px] rounded-full`} />
-        <div className="absolute -right-40 bottom-[-15%] w-[560px] h-[560px] bg-white/5 blur-[170px] rounded-full" />
+        <div
+          className={`absolute -top-28 left-1/2 -translate-x-1/2 w-[720px] h-[720px] ${theme.glowA} blur-[140px] rounded-full`}
+        />
+        <div className={`absolute -left-40 top-[30%] w-[560px] h-[560px] ${theme.glowB} blur-[140px] rounded-full`} />
+        <div className="absolute -right-40 bottom-[-15%] w-[560px] h-[560px] bg-white/5 blur-[160px] rounded-full" />
       </div>
 
       {/* Sticky Header */}
-      <header className="relative z-40 px-5 py-5 border-b border-white/5 bg-black/10 backdrop-blur-md sticky top-0">
-        <div className="flex items-end justify-between gap-4">
-          <div className="min-w-0">
-            <div className="flex flex-wrap items-center gap-2">
-              <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-white/10 bg-white/5">
-                <span className="text-[11px] font-black tracking-[0.22em] uppercase text-slate-200">NREMTS</span>
-                <span className={`text-[11px] font-mono ${theme.accent}`}>{theme.modeLabel} • {level}</span>
-              </div>
-
-              {plan ? (
-                <div className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full border ${theme.chip}`}>
-                  <span className={`text-[10px] font-black tracking-widest uppercase ${theme.chipText}`}>plan</span>
-                  <span className="text-[11px] font-mono text-white">{plan.toUpperCase()}</span>
-                </div>
-              ) : (
-                <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-white/10 bg-white/5">
-                  <span className="text-[10px] font-black tracking-widest uppercase text-slate-300">free</span>
-                  <span className="text-[11px] font-mono text-slate-200">locked</span>
-                </div>
-              )}
+      <header className="relative z-40 p-6 flex justify-between items-end border-b border-white/5 bg-black/10 backdrop-blur-md sticky top-0">
+        <div>
+          <div className="flex items-center gap-2">
+            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-white/10 bg-white/5">
+              <span className="text-[11px] font-black tracking-[0.22em] uppercase text-slate-200">NREMTS</span>
+              <span className={`text-[11px] font-mono ${theme.accent}`}>{level} MODE</span>
             </div>
 
-            <div className="mt-3 flex items-center gap-2 min-w-0">
-              <h1 className="text-xl font-black tracking-tight truncate">
-                {userName}
-              </h1>
-              <span className="text-white/20">•</span>
-              <span className={`text-xs font-black uppercase tracking-widest ${status.tone}`}>{status.label}</span>
-            </div>
-
-            <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px] font-mono text-slate-400">
-              <span>T-{daysToExam} days</span>
-              <span className="text-white/15">|</span>
-              <button onClick={() => setShowExamSetter((v) => !v)} className="text-slate-300 hover:text-white">
-                {examDate ? "edit exam date" : "set exam date"}
-              </button>
-              <span className="text-white/15">|</span>
-              <button
-                onClick={() => switchLevel(level === "EMT" ? "Paramedic" : "EMT")}
-                className={`inline-flex items-center gap-2 px-2.5 py-1 rounded-full border ${theme.chip}`}
-              >
-                <span className={`text-[10px] font-black uppercase tracking-widest ${theme.chipText}`}>switch</span>
-                <span className="text-[11px] font-mono text-white">{level === "EMT" ? "Paramedic" : "EMT"}</span>
-              </button>
-            </div>
-
-            {showExamSetter && (
-              <div className="mt-3 flex flex-wrap items-center gap-2">
-                <input
-                  type="date"
-                  value={examDate}
-                  onChange={(e) => setExamDate(e.target.value)}
-                  className="bg-black/30 border border-white/10 rounded-xl px-3 py-2 text-sm text-white outline-none"
-                />
-                <button
-                  onClick={saveExamDate}
-                  className={`px-4 py-2 rounded-xl font-black text-sm border border-white/10 bg-gradient-to-r ${theme.btnGrad}`}
-                >
-                  SAVE
-                </button>
-                <button
-                  onClick={() => setShowExamSetter(false)}
-                  className="px-4 py-2 rounded-xl font-black text-sm bg-white/5 border border-white/10 hover:bg-white/10"
-                >
-                  CANCEL
-                </button>
+            {plan && (
+              <div className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full border ${theme.chip}`}>
+                <span className={`text-[10px] font-black tracking-widest uppercase ${theme.chipText}`}>plan</span>
+                <span className="text-[11px] font-mono text-white">{plan.toUpperCase()}</span>
               </div>
             )}
           </div>
 
-          <div className="text-right shrink-0">
-            <div className="flex items-end justify-end gap-1">
-              <span className={`text-4xl font-black tracking-tighter ${theme.accent}`}>{readiness}</span>
-              <span className="text-sm font-bold text-white/35 mb-1">%</span>
+          <h1 className="mt-3 text-2xl font-black text-white tracking-tight leading-none">
+            {statusLabel} <span className="text-white/40">•</span> <span className="text-white/70">{userName}</span>
+          </h1>
+
+          <div className="mt-2 flex items-center gap-2 text-[11px] text-slate-400 font-mono">
+            <span>T-{daysToExam} days</span>
+            <span className="text-white/15">|</span>
+            <span>Q: {questionsAnswered}</span>
+            <span className="text-white/15">|</span>
+            <button onClick={() => setShowExamSetter((v) => !v)} className="text-slate-300 hover:text-white">
+              {examDate ? "edit exam date" : "set exam date"}
+            </button>
+          </div>
+
+          {showExamSetter && (
+            <div className="mt-3 flex items-center gap-2">
+              <input
+                type="date"
+                value={examDate}
+                onChange={(e) => setExamDate(e.target.value)}
+                className="bg-black/30 border border-white/10 rounded-xl px-3 py-2 text-sm text-white outline-none"
+              />
+              <button
+                onClick={saveExamDate}
+                className={`px-4 py-2 rounded-xl font-black text-sm border border-white/10 bg-gradient-to-r ${theme.btn}`}
+              >
+                SAVE
+              </button>
+              <button
+                onClick={() => setShowExamSetter(false)}
+                className="px-4 py-2 rounded-xl font-black text-sm bg-white/5 border border-white/10 hover:bg-white/10"
+              >
+                CANCEL
+              </button>
             </div>
-            <div className="mt-2 flex justify-end gap-2">
-              {passProb !== null && (
-                <div className={`px-3 py-1.5 rounded-full border ${theme.chip}`}>
-                  <span className={`text-[10px] font-black uppercase tracking-widest ${theme.chipText}`}>pass</span>{" "}
-                  <span className="text-[11px] font-mono text-white">{passProb}%</span>
-                </div>
-              )}
-              {ciLow !== null && ciHigh !== null && (
-                <div className="px-3 py-1.5 rounded-full border border-white/10 bg-white/5">
-                  <span className="text-[10px] font-black uppercase tracking-widest text-slate-300">ci</span>{" "}
-                  <span className="text-[11px] font-mono text-white">{ciLow}–{ciHigh}</span>
-                </div>
-              )}
-            </div>
-            <div className="mt-2 text-[10px] font-mono text-slate-400">
-              mastered: <span className="text-white font-black">{masteredCount}</span> / {totalCount || "—"}
-            </div>
+          )}
+        </div>
+
+        <div className="text-right">
+          <div className="flex items-end justify-end gap-2">
+            <span className={`text-4xl font-black ${theme.accent}`}>{readiness}</span>
+            <span className="text-sm font-bold text-gray-500 mb-1">%</span>
+          </div>
+
+          <div className={`text-[11px] font-black ${statusTone} uppercase tracking-widest`}>
+            {readiness >= 80 ? "ON TRACK" : readiness >= 65 ? "BORDERLINE" : "AT RISK"}
+          </div>
+
+          <div className="mt-2 flex justify-end gap-2">
+            {passProb !== null && (
+              <div className={`px-3 py-1.5 rounded-full border ${theme.chip}`}>
+                <span className={`text-[10px] font-black uppercase tracking-widest ${theme.chipText}`}>pass</span>{" "}
+                <span className="text-[11px] font-mono text-white">{passProb}%</span>
+              </div>
+            )}
+
+            {ciLow !== null && ciHigh !== null && (
+              <div className="px-3 py-1.5 rounded-full border border-white/10 bg-white/5">
+                <span className="text-[10px] font-black uppercase tracking-widest text-slate-300">ci</span>{" "}
+                <span className="text-[11px] font-mono text-white">
+                  {ciLow}–{ciHigh}
+                </span>
+              </div>
+            )}
           </div>
         </div>
       </header>
@@ -393,50 +349,235 @@ export default function DashboardPage() {
       {/* Main */}
       <main className="relative z-10 p-4 space-y-4 max-w-lg mx-auto">
         {/* Anatomy Centerpiece */}
-        <section className="relative h-[340px] flex items-center justify-center rounded-3xl border border-white/10 bg-slate-900/25 overflow-hidden">
-          <div className="absolute top-4 left-4 right-4 flex justify-between z-20 text-[10px] font-mono text-slate-500">
-            <div>
-              mode: <span className={theme.accentStrong}>{theme.modeLabel}</span>
+        <section className="relative h-[340px] flex items-center justify-center">
+          <div className="absolute top-0 left-0 w-full flex justify-between px-4 z-20">
+            <div className="text-[10px] text-gray-600 font-mono leading-tight">
+              OPERATOR: {theme.icon}
               <br />
-              focus: <span className="text-white/80">{weakDomain}</span>
+              REGION: US-NREMT
             </div>
-            <div className="text-right">
-              risk: <span className="text-red-300">{weakPct}%</span>
+            <div className="text-[10px] text-gray-600 font-mono text-right leading-tight">
+              FOCUS: {weakDomain.toUpperCase()}
               <br />
-              t-{daysToExam} days
+              RISK: <span className="text-red-300">{weakPct}%</span>
             </div>
           </div>
 
-          <div className="absolute inset-0 pointer-events-none">
-            <div className={`absolute -top-24 left-1/2 -translate-x-1/2 w-[560px] h-[560px] ${theme.glowA} blur-[120px] rounded-full`} />
+          <div className="relative w-full h-full flex items-center justify-center">
+            <div className={`absolute inset-0 bg-gradient-to-t ${theme.glowA} to-transparent rounded-full opacity-50 blur-3xl`} />
+            <BodyHeatmap />
           </div>
 
-          <BodyHeatmap />
-
-          {/* Floating Weakness Indicator */}
+          {/* Floating weakness card */}
           <motion.div
-            initial={{ scale: 0.92, opacity: 0 }}
+            initial={{ scale: 0.9, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
-            transition={{ delay: 0.1 }}
-            className="absolute bottom-4 right-4 backdrop-blur-md bg-black/35 border border-white/10 p-3 rounded-2xl shadow-2xl max-w-[170px]"
+            transition={{ delay: 0.15 }}
+            className="absolute bottom-6 right-2 backdrop-blur-md bg-slate-900/70 border border-white/10 p-3 rounded-xl shadow-2xl max-w-[160px]"
           >
-            <div className="text-[9px] text-slate-400 uppercase tracking-widest mb-1">Weakest domain</div>
+            <div className="text-[9px] text-slate-400 uppercase tracking-widest mb-1">Weakest Domain</div>
             <div className={`text-sm font-black leading-tight ${theme.accent}`}>{weakDomain.toUpperCase()}</div>
-            <div className="mt-2 w-full bg-white/10 h-1.5 rounded-full overflow-hidden">
-              <div className={`h-full ${theme.bar} ${theme.barGlow}`} style={{ width: `${clamp(weakPct)}%` }} />
+            <div className="w-full bg-white/10 h-1 mt-2 rounded-full overflow-hidden">
+              <div className={`h-full ${theme.bar}`} style={{ width: `${clamp(weakPct)}%` }} />
             </div>
           </motion.div>
         </section>
 
-        {/* Daily Mission */}
+        {/* The Shift (retention) */}
         <motion.section
-          initial={{ y: 14, opacity: 0 }}
+          initial={{ y: 16, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
-          className="bg-gradient-to-br from-slate-900/55 to-black/20 border border-white/10 p-5 rounded-3xl relative overflow-hidden"
+          className="bg-gradient-to-br from-slate-900/55 to-black/25 border border-white/10 p-5 rounded-2xl relative overflow-hidden"
         >
-          <div className={`absolute inset-0 -z-10 blur-[150px] ${theme.glowA}`} />
+          <div className={`absolute inset-0 -z-10 blur-[140px] ${theme.glowA}`} />
 
-          <div className="flex items-start justify-between gap-3">
-            <div className="min-w-0">
-              <div className="text-xs font-black uppercase tracking-widest text-slate-400">Daily mission</div>
-              <div className="mt-1 text-xl font-
+          <div className="flex justify-between items-start gap-3 mb-3">
+            <div>
+              <h3 className="text-slate-400 text-xs font-black uppercase tracking-widest mb-1">Daily Mission</h3>
+              <h2 className="text-xl font-black text-white leading-tight">
+                {shiftComplete ? "Shift Complete" : "Start Your Shift"}
+              </h2>
+              <p className="mt-1 text-[11px] text-slate-400 font-semibold">
+                {nextAction.title} • <span className="text-white/70">{nextAction.sub}</span>
+              </p>
+            </div>
+
+            {/* Real 7-day dots (no fake fill) */}
+            <div className="flex gap-2">
+              {streakDays.map((item, i) => (
+                <div key={i} className="flex flex-col items-center gap-1">
+                  <div
+                    className={`w-6 h-6 rounded-full flex items-center justify-center text-[9px] font-black ${
+                      item.active ? `${theme.bar} text-black` : "bg-white/10 text-gray-500"
+                    }`}
+                  >
+                    {item.active ? "✓" : ""}
+                  </div>
+                  <span className="text-[9px] text-gray-600 font-mono">{item.day}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="grid grid-cols-3 gap-2 mt-4">
+            <Link
+              href={ROUTES.drill}
+              className={`col-span-2 w-full py-3 rounded-xl font-black text-sm text-white border border-white/10 bg-gradient-to-r ${theme.btn} shadow-lg hover:shadow-white/10 transition-all flex items-center justify-center gap-2`}
+            >
+              <span className={`w-2 h-2 rounded-full ${shiftComplete ? theme.bar : "bg-white animate-pulse"}`} />
+              {shiftComplete ? "REVIEW DRILL" : "BEGIN 15-MIN DRILL"}
+            </Link>
+
+            <Link
+              href={ROUTES.diagnostic}
+              className="w-full py-3 rounded-xl font-black text-sm bg-white/5 border border-white/10 hover:bg-white/10 flex items-center justify-center"
+            >
+              RETEST
+            </Link>
+          </div>
+
+          <div className="mt-3 flex flex-wrap gap-2 justify-center opacity-95">
+            <div className={`px-3 py-1.5 rounded-full border ${theme.chip}`}>
+              <span className={`text-[10px] font-black uppercase tracking-widest ${theme.chipText}`}>focus</span>{" "}
+              <span className="text-[11px] font-mono text-white">{weakDomain}</span>
+            </div>
+            <div className="px-3 py-1.5 rounded-full border border-white/10 bg-white/5">
+              <span className="text-[10px] font-black uppercase tracking-widest text-slate-300">target</span>{" "}
+              <span className="text-[11px] font-mono text-white">+6 readiness today</span>
+            </div>
+          </div>
+        </motion.section>
+
+        {/* Critical Flag */}
+        <motion.section
+          initial={{ y: 16, opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          transition={{ delay: 0.05 }}
+          className="bg-red-900/10 border border-red-500/30 p-5 rounded-2xl flex items-center gap-4"
+        >
+          <div className="w-10 h-10 rounded-full bg-red-500/20 flex items-center justify-center text-red-300 animate-pulse font-black">
+            !
+          </div>
+          <div className="min-w-0">
+            <h3 className="text-white font-black text-sm truncate">Critical Flag: {weakDomain}</h3>
+            <p className="text-red-300/80 text-xs font-semibold">
+              Your current risk area is at <span className="text-white font-black">{weakPct}%</span>. Fix plan is ready.
+            </p>
+          </div>
+          <Link
+            href={ROUTES.drill}
+            className="ml-auto text-xs bg-red-600 hover:bg-red-500 text-white px-4 py-2 rounded-xl font-black transition-colors"
+          >
+            FIX
+          </Link>
+        </motion.section>
+
+        {/* Domain Breakdown */}
+        {domainBreakdown.length > 0 && (
+          <motion.section
+            initial={{ y: 16, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            transition={{ delay: 0.08 }}
+            className="rounded-2xl bg-slate-900/45 border border-white/10 p-5"
+          >
+            <div className="flex items-center justify-between">
+              <h3 className="text-xs font-black text-slate-300 uppercase tracking-widest">Domain Breakdown</h3>
+              <span className={`text-[11px] font-mono ${theme.accent}`}>from your diagnostic</span>
+            </div>
+
+            <div className="mt-4 space-y-2">
+              {domainBreakdown.slice(0, 5).map((d) => (
+                <div key={d.category} className="rounded-xl bg-white/5 border border-white/10 p-3">
+                  <div className="flex items-center justify-between">
+                    <div className="text-sm font-extrabold text-slate-100">{d.category}</div>
+                    <div className="text-sm font-black text-white">{clamp(Math.round(d.accuracy))}%</div>
+                  </div>
+                  <div className="mt-2 w-full bg-white/10 h-2 rounded-full overflow-hidden">
+                    <div className={`h-full ${theme.bar} ${theme.barGlow}`} style={{ width: `${clamp(d.accuracy)}%` }} />
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="mt-4 grid grid-cols-2 gap-2">
+              <Link
+                href={ROUTES.drill}
+                className={`py-3 rounded-xl font-black text-sm text-white border border-white/10 bg-gradient-to-r ${theme.btn} flex items-center justify-center`}
+              >
+                START FIX PLAN →
+              </Link>
+              <Link
+                href={ROUTES.review}
+                className="py-3 rounded-xl font-black text-sm bg-white/5 border border-white/10 hover:bg-white/10 flex items-center justify-center"
+              >
+                REVIEW MISSES
+              </Link>
+            </div>
+          </motion.section>
+        )}
+
+        {/* Last Missed */}
+        {missed && (
+          <motion.section
+            initial={{ y: 16, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            transition={{ delay: 0.1 }}
+            className="rounded-2xl bg-slate-900/45 border border-white/10 p-5"
+          >
+            <div className="flex items-center justify-between">
+              <h3 className="text-xs font-black text-slate-300 uppercase tracking-widest">Last Missed</h3>
+              <span className={`text-[11px] font-mono ${theme.accent}`}>{missed.category}</span>
+            </div>
+
+            <div className="mt-3 text-sm font-extrabold text-white leading-relaxed">{missed.text}</div>
+
+            <div className="mt-3 text-[11px] text-slate-400 font-semibold">
+              Tap “Review Misses” to see rationales and lock it in.
+            </div>
+
+            <div className="mt-4">
+              <Link
+                href={ROUTES.review}
+                className="w-full py-3 rounded-xl font-black text-sm bg-white/5 border border-white/10 hover:bg-white/10 flex items-center justify-center"
+              >
+                REVIEW MISSES →
+              </Link>
+            </div>
+          </motion.section>
+        )}
+
+        {/* Pro Upgrade (only if no plan) */}
+        {!plan && (
+          <motion.section
+            initial={{ y: 16, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            transition={{ delay: 0.12 }}
+            className="rounded-2xl bg-black/25 border border-white/10 p-5"
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <div className="text-xs font-black uppercase tracking-widest text-slate-300">Unlock the full machine</div>
+                <div className="mt-1 text-sm text-slate-300 leading-relaxed">
+                  Full sims + rationales + auto fix plan every day until you pass.
+                </div>
+              </div>
+              <div className={`px-3 py-1.5 rounded-full border ${theme.chip}`}>
+                <span className={`text-[10px] font-black uppercase tracking-widest ${theme.chipText}`}>pro</span>{" "}
+                <span className="text-[11px] font-mono text-white">LOCKED</span>
+              </div>
+            </div>
+
+            <Link
+              href={ROUTES.paywall}
+              className={`mt-4 w-full py-3 rounded-xl font-black text-sm text-white border border-white/10 bg-gradient-to-r ${theme.btn} flex items-center justify-center`}
+            >
+              UNLOCK MY PLAN →
+            </Link>
+          </motion.section>
+        )}
+      </main>
+
+      <Dock />
+    </div>
+  );
+}
