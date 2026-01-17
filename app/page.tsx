@@ -1,6 +1,6 @@
 "use client";
 
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 
@@ -20,7 +20,7 @@ export default function Home() {
   return (
     <main className="flex min-h-screen flex-col items-center justify-center bg-[#0F172A] overflow-hidden relative p-4">
       
-      {/* Background Ambience (Red/Blue for NREMT) */}
+      {/* Background Ambience */}
       <div className="absolute top-0 left-0 w-full h-full overflow-hidden z-0 pointer-events-none">
         <div className="absolute top-[-10%] left-[-10%] w-[500px] h-[500px] bg-blue-600/20 blur-[120px] rounded-full" />
         <div className="absolute bottom-[-10%] right-[-10%] w-[500px] h-[500px] bg-red-600/10 blur-[120px] rounded-full" />
@@ -36,7 +36,7 @@ export default function Home() {
           className="px-3 py-1 rounded-full border border-white/10 bg-white/5 backdrop-blur-sm"
         >
           <span className="text-xs font-bold tracking-[0.2em] text-blue-400">
-            NREMT 2026 PROTOCOLS
+            OFFICIAL NREMT STANDARDS
           </span>
         </motion.div>
 
@@ -55,6 +55,32 @@ export default function Home() {
           </motion.h1>
         </div>
 
+        {/* Dynamic Subtext */}
+        <div className="h-12 flex items-center justify-center">
+          <AnimatePresence mode="wait">
+            {!showLevelSelect ? (
+              <motion.p 
+                key="intro"
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                className="text-gray-400 text-sm md:text-base font-medium max-w-xs"
+              >
+                Take the free 5-question diagnostic to calculate your current pass probability.
+              </motion.p>
+            ) : (
+              <motion.p 
+                key="select"
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="text-blue-300 text-sm md:text-base font-mono"
+              >
+                &gt; SELECT CERTIFICATION LEVEL TO CALIBRATE:
+              </motion.p>
+            )}
+          </AnimatePresence>
+        </div>
+
         {/* INTERACTIVE AREA */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -69,45 +95,34 @@ export default function Home() {
             >
               <div className="absolute inset-0 bg-gradient-to-r from-blue-400 via-white to-blue-400 opacity-0 group-hover:opacity-20 transition-opacity duration-300" />
               <span className="relative z-10 flex items-center justify-center gap-2">
-                START SIMULATION <span>→</span>
+                START DIAGNOSTIC <span>→</span>
               </span>
             </button>
           ) : (
-            <div className="space-y-6">
-              {/* Typewriter Instructions */}
-              <motion.p 
-                initial={{ opacity: 0, height: 0 }}
-                animate={{ opacity: 1, height: "auto" }}
-                className="text-gray-400 text-sm font-mono"
+            <div className="grid grid-cols-2 gap-4">
+              {/* EMT BUTTON */}
+              <motion.button 
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                onClick={() => selectLevel("EMT")}
+                className="group relative p-6 bg-blue-900/20 border border-blue-500/50 hover:bg-blue-600 hover:border-blue-500 rounded-xl transition-all duration-200 backdrop-blur-sm"
               >
-                Select your certification level to initialize diagnostic:
-              </motion.p>
+                <div className="text-4xl mb-3">🚑</div>
+                <div className="text-white font-black text-xl">EMT</div>
+                <div className="text-blue-200 text-[10px] font-bold tracking-widest mt-1 group-hover:text-white">BLS (EMT/EMR)</div>
+              </motion.button>
 
-              <div className="grid grid-cols-2 gap-4">
-                {/* EMT BUTTON (BLS) */}
-                <motion.button 
-                  whileHover={{ scale: 1.05, rotateY: 5 }}
-                  whileTap={{ scale: 0.95 }}
-                  onClick={() => selectLevel("EMT")}
-                  className="group relative p-6 bg-blue-900/20 border border-blue-500/50 hover:bg-blue-600 hover:border-blue-500 rounded-xl transition-all duration-200 backdrop-blur-sm"
-                >
-                  <div className="text-4xl mb-3">🚑</div>
-                  <div className="text-white font-black text-xl">EMT</div>
-                  <div className="text-blue-200 text-[10px] font-bold tracking-widest mt-1 group-hover:text-white">BLS (EMT/EMR)</div>
-                </motion.button>
-
-                {/* PARAMEDIC BUTTON (ALS) */}
-                <motion.button 
-                  whileHover={{ scale: 1.05, rotateY: -5 }}
-                  whileTap={{ scale: 0.95 }}
-                  onClick={() => selectLevel("Paramedic")}
-                  className="group relative p-6 bg-red-900/20 border border-red-500/50 hover:bg-red-600 hover:border-red-500 rounded-xl transition-all duration-200 backdrop-blur-sm"
-                >
-                  <div className="text-4xl mb-3">⚡️</div>
-                  <div className="text-white font-black text-xl">PARAMEDIC</div>
-                  <div className="text-red-200 text-[10px] font-bold tracking-widest mt-1 group-hover:text-white">ALS (NRP/AEMT)</div>
-                </motion.button>
-              </div>
+              {/* PARAMEDIC BUTTON */}
+              <motion.button 
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                onClick={() => selectLevel("Paramedic")}
+                className="group relative p-6 bg-red-900/20 border border-red-500/50 hover:bg-red-600 hover:border-red-500 rounded-xl transition-all duration-200 backdrop-blur-sm"
+              >
+                <div className="text-4xl mb-3">⚡️</div>
+                <div className="text-white font-black text-xl">PARAMEDIC</div>
+                <div className="text-red-200 text-[10px] font-bold tracking-widest mt-1 group-hover:text-white">ALS (Paramedic/AEMT)</div>
+              </motion.button>
             </div>
           )}
         </motion.div>
@@ -118,7 +133,7 @@ export default function Home() {
           transition={{ delay: 1.5 }}
           className="text-white/20 text-[10px] uppercase tracking-widest mt-8"
         >
-          No Account Required • 60 Seconds
+          No Sign Up Required • 60 Seconds
         </motion.p>
 
       </div>
