@@ -22,7 +22,7 @@ export default function PaywallPage() {
   return (
     <div className="min-h-screen bg-[#0F172A] text-white font-sans flex flex-col items-center p-4 md:p-6 relative overflow-y-auto">
       
-      {/* Red/Blue Glows */}
+      {/* Background Glows */}
       <div className="absolute top-0 left-0 w-full h-full overflow-hidden z-0 pointer-events-none">
         <div className="absolute top-[-10%] left-1/2 -translate-x-1/2 w-[600px] h-[600px] bg-red-600/10 blur-[120px] rounded-full" />
       </div>
@@ -31,9 +31,9 @@ export default function PaywallPage() {
       <motion.div 
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="z-10 w-full max-w-sm mt-4 mb-8"
+        className="z-10 w-full max-w-sm mt-4 mb-6"
       >
-        <div className="bg-white rounded-2xl p-6 shadow-2xl shadow-blue-900/50 relative overflow-hidden text-black transform rotate-1 hover:rotate-0 transition-transform duration-500 border-t-4 border-red-600">
+        <div className="bg-white rounded-2xl p-6 shadow-2xl shadow-blue-900/50 relative overflow-hidden text-black transform rotate-1 border-t-4 border-red-600">
           <div className="absolute inset-0 bg-gradient-to-br from-transparent via-white/30 to-transparent opacity-50 pointer-events-none" />
           
           <div className="flex justify-between items-start mb-6">
@@ -65,65 +65,36 @@ export default function PaywallPage() {
         </div>
       </motion.div>
 
-      {/* 2. VALUE PROPS */}
-      <div className="w-full max-w-sm space-y-3 mb-8 z-10">
-        <div className="flex items-center gap-3 text-sm">
-          <span className="text-red-400 text-lg">📚</span>
-          <span className="text-gray-200">Unlock <strong>2026 Clinical Protocols</strong></span>
-        </div>
-        <div className="flex items-center gap-3 text-sm">
-          <span className="text-blue-400 text-lg">🧠</span>
-          <span className="text-gray-200">Unlimited <strong>Clinical Scenarios</strong></span>
-        </div>
-        <div className="flex items-center gap-3 text-sm">
-          <span className="text-green-400 text-lg">🛡️</span>
-          <span className="text-gray-200"><strong>100% Pass Guarantee</strong> or Refund</span>
+      {/* 2. THE VALUE STACK (Compelling List) */}
+      <div className="w-full max-w-sm mb-8 z-10 bg-slate-900/50 p-5 rounded-2xl border border-white/5">
+        <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-4">Pro Medical Suite Includes:</h3>
+        <div className="space-y-3">
+          <FeatureRow icon="🏥" text="Full NREMT Simulator (70-120Q)" />
+          <FeatureRow icon="📚" text="3,000+ Question Bank" />
+          <FeatureRow icon="🧠" text="Clinical Rationales & Weakness Plan" />
+          <FeatureRow icon="📈" text="Readiness Score & Progress Report" />
+          <FeatureRow icon="⚡️" text="EMT + Paramedic Modes" />
+          <FeatureRow icon="🛡️" text="100% Pass Guarantee or Money Back" highlight />
         </div>
       </div>
 
       {/* 3. PRICING TIERS */}
       <div className="w-full max-w-sm space-y-3 z-10 mb-8">
-        
         {/* LIFETIME */}
-        <button
-          onClick={() => setSelectedPlan("lifetime")}
-          className={`relative w-full p-4 rounded-xl border-2 transition-all duration-300 text-left ${
-            selectedPlan === "lifetime" 
-              ? "bg-blue-600/20 border-blue-500 shadow-[0_0_30px_-10px_rgba(59,130,246,0.4)]" 
-              : "bg-slate-800/50 border-slate-700 opacity-80 hover:opacity-100"
-          }`}
-        >
+        <button onClick={() => setSelectedPlan("lifetime")} className={`relative w-full p-4 rounded-xl border-2 transition-all duration-300 text-left ${selectedPlan === "lifetime" ? "bg-blue-600/20 border-blue-500 shadow-[0_0_30px_-10px_rgba(59,130,246,0.4)]" : "bg-slate-800/50 border-slate-700 opacity-80 hover:opacity-100"}`}>
           {selectedPlan === "lifetime" && (
-            <div className="absolute -top-3 right-4 bg-gradient-to-r from-red-500 to-red-600 text-white text-[10px] font-bold px-3 py-1 rounded-full uppercase tracking-wide shadow-lg">
-              Best Value
-            </div>
+            <div className="absolute -top-3 right-4 bg-gradient-to-r from-red-500 to-red-600 text-white text-[10px] font-bold px-3 py-1 rounded-full uppercase tracking-wide shadow-lg">Best Value</div>
           )}
           <div className="flex justify-between items-center">
-            <div>
-              <h3 className="font-bold text-white">Lifetime Access</h3>
-              <p className="text-xs text-slate-400">One-time payment. Own it forever.</p>
-            </div>
-            <div className="text-right">
-              <span className="text-xs text-slate-500 line-through block">$149</span>
-              <span className="text-xl font-black text-white">$69</span>
-            </div>
+            <div><h3 className="font-bold text-white">Lifetime Access</h3><p className="text-xs text-slate-400">One-time payment. Own it forever.</p></div>
+            <div className="text-right"><span className="text-xs text-slate-500 line-through block">$149</span><span className="text-xl font-black text-white">$69</span></div>
           </div>
         </button>
 
         {/* MONTHLY */}
-        <button
-          onClick={() => setSelectedPlan("monthly")}
-          className={`relative w-full p-4 rounded-xl border-2 transition-all duration-300 text-left ${
-            selectedPlan === "monthly" 
-              ? "bg-blue-600/20 border-blue-500" 
-              : "bg-slate-800/50 border-slate-700 opacity-80 hover:opacity-100"
-          }`}
-        >
+        <button onClick={() => setSelectedPlan("monthly")} className={`relative w-full p-4 rounded-xl border-2 transition-all duration-300 text-left ${selectedPlan === "monthly" ? "bg-blue-600/20 border-blue-500" : "bg-slate-800/50 border-slate-700 opacity-80 hover:opacity-100"}`}>
           <div className="flex justify-between items-center">
-            <div>
-              <h3 className="font-bold text-white">Monthly Pro</h3>
-              <p className="text-xs text-slate-400">Full access. Cancel anytime.</p>
-            </div>
+            <div><h3 className="font-bold text-white">Monthly Pro</h3><p className="text-xs text-slate-400">Cancel anytime.</p></div>
             <span className="text-xl font-bold text-white">$19<span className="text-sm font-normal text-slate-400">/mo</span></span>
           </div>
         </button>
@@ -131,27 +102,31 @@ export default function PaywallPage() {
 
       {/* CTA Button */}
       <Link href="/dashboard" className="w-full max-w-sm z-10 sticky bottom-6">
-        <motion.button
-          whileHover={{ scale: 1.02 }}
-          whileTap={{ scale: 0.98 }}
-          className="w-full py-4 bg-gradient-to-r from-blue-600 to-cyan-600 rounded-xl font-black text-lg shadow-lg hover:shadow-cyan-500/25 transition-all text-white border border-white/10"
-        >
+        <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} className="w-full py-4 bg-gradient-to-r from-blue-600 to-cyan-600 rounded-xl font-black text-lg shadow-lg hover:shadow-cyan-500/25 transition-all text-white border border-white/10">
           UNLOCK CERTIFICATION
         </motion.button>
         
         {/* OFFICIAL FOOTER */}
         <div className="flex justify-center items-center gap-4 mt-4 opacity-60">
           <div className="flex items-center gap-1 text-[10px] text-gray-400 font-bold uppercase tracking-wider">
-            <svg className="w-3 h-3 text-green-500" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M2.166 10a.75.75 0 01.75-.75h14.168a.75.75 0 01.75.75v3.5A2.75 2.75 0 0115.084 16H4.916A2.75 2.75 0 012.166 13.25V10zm.75 1.75v1.5c0 .69.56 1.25 1.25 1.25h11.668c.69 0 1.25-.56 1.25-1.25v-1.5H2.916z" clipRule="evenodd" /><path d="M10 2a4 4 0 00-4 4v2.25h8V6a4 4 0 00-4-4z" /></svg>
-            SSL SECURE
+            <svg className="w-3 h-3 text-green-500" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd"/></svg>
+            OFFICIAL VERIFIED NREMT PREP
           </div>
           <div className="flex items-center gap-1 text-[10px] text-gray-400 font-bold uppercase tracking-wider">
-            <svg className="w-3 h-3 text-green-500" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M16.403 12.652a3 3 0 000-5.304 3 3 0 00-3.75-3.751 3 3 0 00-5.305 0 3 3 0 00-3.751 3.75 3 3 0 000 5.305 3 3 0 003.75 3.751 3 3 0 005.305 0 3 3 0 003.751-3.751zM8.822 9.97L7.42 11.37a.75.75 0 11-1.06-1.06l2-2a.75.75 0 011.06 0l4.25 4.25a.75.75 0 010 1.06l-2 2a.75.75 0 11-1.06-1.06l1.47-1.47-2.25-2.25z" clipRule="evenodd" /></svg>
-            OFFICIAL VERIFIED
+            <svg className="w-3 h-3 text-gray-400" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd"/></svg>
+            SECURE PAYMENT
           </div>
         </div>
       </Link>
+    </div>
+  );
+}
 
+function FeatureRow({icon, text, highlight = false}: {icon: string, text: string, highlight?: boolean}) {
+  return (
+    <div className="flex items-start gap-3">
+      <span className="text-lg leading-none mt-0.5">{icon}</span>
+      <span className={`text-sm ${highlight ? "text-yellow-400 font-bold" : "text-gray-300"}`}>{text}</span>
     </div>
   );
 }
