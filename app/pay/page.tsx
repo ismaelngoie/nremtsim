@@ -6,9 +6,15 @@ import Link from "next/link";
 
 type PlanKey = "monthly" | "annual" | "lifetime";
 
-const PRICING = {
+type PricingTier = {
+  price: number;
+  cadence: string;
+  strike: number | null;
+};
+
+const PRICING: Record<PlanKey, PricingTier> = {
   monthly: { price: 19, cadence: "/mo", strike: null },
-  annual: { price: 119, cadence: "/yr", strike: 228 }, // 19*12=228 anchor
+  annual: { price: 119, cadence: "/yr", strike: 228 }, // 19*12 anchor
   lifetime: { price: 249, cadence: " once", strike: 399 },
 };
 
@@ -17,9 +23,9 @@ const fmt = (n: number) => `$${n}`;
 export default function PaywallPage() {
   const [selectedPlan, setSelectedPlan] = useState<PlanKey>("annual");
 
-  // Personalization
+  // Personalization (defaults are safe fallbacks)
   const [userLevel, setUserLevel] = useState("EMT");
-  const [userName, setUserName] = useState("CANDIDATE");
+  const [userName, setUserName] = useState("FUTURE MEDIC");
   const [readiness, setReadiness] = useState(68);
   const [weakDomain, setWeakDomain] = useState("Cardiology");
   const [weakPct, setWeakPct] = useState(42);
@@ -27,8 +33,18 @@ export default function PaywallPage() {
 
   useEffect(() => {
     setUserLevel(localStorage.getItem("userLevel") || "EMT");
-    // In real app, you'd pull name from auth or onboarding
-    setUserName("FUTURE MEDIC");
+    setUserName(localStorage.getItem("userName") || "FUTURE MEDIC");
+
+    // If you store these after a sim, this will auto-personalize the paywall
+    const rs = Number(localStorage.getItem("readinessScore"));
+    const wd = localStorage.getItem("weakestDomain");
+    const wp = Number(localStorage.getItem("weakestDomainPct"));
+    const dte = Number(localStorage.getItem("daysToExam"));
+
+    if (Number.isFinite(rs) && rs >= 0 && rs <= 100) setReadiness(Math.round(rs));
+    if (wd) setWeakDomain(wd);
+    if (Number.isFinite(wp) && wp >= 0 && wp <= 100) setWeakPct(Math.round(wp));
+    if (Number.isFinite(dte) && dte >= 0 && dte <= 365) setDaysToExam(Math.round(dte));
   }, []);
 
   const status = useMemo(() => {
@@ -37,7 +53,6 @@ export default function PaywallPage() {
     return { label: "AT RISK", tone: "text-red-400" };
   }, [readiness]);
 
-  // Future Date for ID Card
   const dateString = useMemo(() => {
     const validDate = new Date();
     validDate.setFullYear(validDate.getFullYear() + 2);
@@ -49,12 +64,11 @@ export default function PaywallPage() {
     return Math.round(perMonth * 100) / 100;
   }, []);
 
-  // In production, this would go to Stripe/RevenueCat
-  const checkoutHref = "/dashboard"; 
+  // IMPORTANT: carry the plan so your checkout knows what to charge
+  const checkoutHref = `/dashboard?plan=${selectedPlan}`;
 
   return (
     <div className="min-h-screen bg-[#0F172A] text-white font-sans flex flex-col items-center px-4 md:px-6 relative overflow-y-auto">
-      
       {/* Background glows */}
       <div className="absolute inset-0 overflow-hidden z-0 pointer-events-none">
         <div className="absolute -top-24 left-1/2 -translate-x-1/2 w-[680px] h-[680px] bg-cyan-500/10 blur-[130px] rounded-full" />
@@ -64,11 +78,7 @@ export default function PaywallPage() {
 
       <div className="w-full max-w-sm z-10 pt-5 pb-32">
         {/* Top header */}
-        <motion.div
-          initial={{ opacity: 0, y: 14 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="mb-4"
-        >
+        <motion.div initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} className="mb-4">
           <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/5 border border-white/10">
             <span className="text-[11px] font-bold tracking-widest text-slate-300 uppercase">
               REPORT LOCKED
@@ -84,8 +94,7 @@ export default function PaywallPage() {
             Your score is <span className="font-bold text-white">{readiness}%</span>{" "}
             <span className={`font-bold ${status.tone}`}>({status.label})</span>. Biggest risk:
             <span className="font-bold text-white"> {weakDomain}</span>{" "}
-            <span className="font-bold text-red-400">({weakPct}%)</span>.
-            Unlock the exact fix plan + unlimited sims.
+            <span className="font-bold text-red-400">({weakPct}%)</span>. Unlock the exact fix plan + unlimited sims.
           </p>
         </motion.div>
 
@@ -114,7 +123,7 @@ export default function PaywallPage() {
           </div>
         </motion.div>
 
-        {/* The ID card (identity upgrade) */}
+        {/* ID card */}
         <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} className="mb-6">
           <div className="bg-white rounded-2xl p-6 shadow-2xl shadow-blue-900/50 relative overflow-hidden text-black transform rotate-1 border-t-4 border-cyan-500">
             <div className="absolute inset-0 bg-gradient-to-br from-transparent via-white/35 to-transparent opacity-60 pointer-events-none" />
@@ -148,20 +157,14 @@ export default function PaywallPage() {
                   {userLevel} MODE
                 </p>
                 <h2 className="text-2xl font-black tracking-tight leading-none">{userName}</h2>
-                <p className="text-[10px] font-mono text-gray-500 mt-1">
-                  VALID THROUGH: {dateString}
-                </p>
+                <p className="text-[10px] font-mono text-gray-500 mt-1">VALID THROUGH: {dateString}</p>
               </div>
             </div>
 
             <div className="flex justify-between items-end">
               <div className="flex gap-2">
-                <div className="px-2 py-1 bg-gray-100 rounded text-[9px] font-black text-gray-600">
-                  FULL SIMS
-                </div>
-                <div className="px-2 py-1 bg-gray-100 rounded text-[9px] font-black text-gray-600">
-                  STUDY PLAN
-                </div>
+                <div className="px-2 py-1 bg-gray-100 rounded text-[9px] font-black text-gray-600">FULL SIMS</div>
+                <div className="px-2 py-1 bg-gray-100 rounded text-[9px] font-black text-gray-600">STUDY PLAN</div>
               </div>
               <div
                 className="h-6 w-24 bg-black opacity-80"
@@ -232,10 +235,10 @@ export default function PaywallPage() {
 
         {/* Annual nudge */}
         <div className="mb-6 rounded-xl bg-blue-500/10 border border-blue-500/20 p-4">
-            <div className="text-sm font-extrabold text-blue-200">Why Annual wins</div>
-            <div className="mt-1 text-sm text-slate-300 leading-relaxed">
-              Most candidates study for weeks. Annual keeps your progress + costs less than 7 months of monthly.
-            </div>
+          <div className="text-sm font-extrabold text-blue-200">Why Annual wins</div>
+          <div className="mt-1 text-sm text-slate-300 leading-relaxed">
+            Most candidates study for weeks. Annual keeps your progress + costs less than 7 months of monthly.
+          </div>
         </div>
 
         {/* Testimonials */}
@@ -289,15 +292,13 @@ export default function PaywallPage() {
               <div className="text-xs text-slate-300 font-semibold">
                 Selected:{" "}
                 <span className="font-black text-white">
-                  {selectedPlan === "annual"
-                    ? "Annual Pro"
-                    : selectedPlan === "monthly"
-                      ? "Monthly Pro"
-                      : "Lifetime"}
+                  {selectedPlan === "annual" ? "Annual Pro" : selectedPlan === "monthly" ? "Monthly Pro" : "Lifetime"}
                 </span>
               </div>
               <div className="text-xs text-slate-400 font-mono">
-                {selectedPlan === "annual" && <>Save {fmt((PRICING.annual.strike ?? 0) - PRICING.annual.price)}</>}
+                {selectedPlan === "annual" && (
+                  <>Save {fmt((PRICING.annual.strike ?? 0) - PRICING.annual.price)}</>
+                )}
                 {selectedPlan === "monthly" && <>Cancel anytime</>}
                 {selectedPlan === "lifetime" && <>Pay once</>}
               </div>
@@ -314,11 +315,11 @@ export default function PaywallPage() {
               </motion.button>
             </Link>
 
-            {/* Trust chips */}
             <div className="mt-3 flex flex-wrap items-center justify-center gap-2 opacity-90">
               <TrustChip icon={<ShieldIcon />} text="Secure checkout" />
               <TrustChip icon={<BoltIcon />} text="Instant access" />
               <TrustChip icon={<CheckIcon />} text="Guarantee eligible" />
+              <TrustChip icon={<PayIcon />} text="Apple Pay • Card • Google Pay" />
             </div>
           </div>
         </div>
@@ -327,26 +328,41 @@ export default function PaywallPage() {
   );
 }
 
-/* ----------------- UI Bits ----------------- */
+/* ----------------- Components ----------------- */
 
-function FeatureRow({ icon, text, highlight = false }: { icon: string; text: string; highlight?: boolean }) {
-  return (
-    <div className="flex items-start gap-3">
-      <span className="text-lg leading-none mt-0.5">{icon}</span>
-      <span className={`text-sm leading-relaxed ${highlight ? "text-yellow-300 font-bold" : "text-slate-200"}`}>
-        {text}
-      </span>
-    </div>
-  );
-}
+type PlanCardProps = {
+  selected: boolean;
+  onClick: () => void;
+  badge?: string;
+  title: string;
+  subtitle: string;
+  rightTop: string | null;
+  rightMain: string;
+  accent: "cyan" | "blue" | "red";
+};
 
-function PlanCard({ selected, onClick, badge, title, subtitle, rightTop, rightMain, accent }: any) {
+function PlanCard({ selected, onClick, badge, title, subtitle, rightTop, rightMain, accent }: PlanCardProps) {
   const accentStyles =
     accent === "cyan"
-      ? { ring: "border-cyan-400/70", bg: "bg-cyan-500/10", glow: "shadow-[0_0_35px_-14px_rgba(34,211,238,0.55)]", badge: "from-cyan-400 to-blue-500" }
+      ? {
+          ring: "border-cyan-400/70",
+          bg: "bg-cyan-500/10",
+          glow: "shadow-[0_0_35px_-14px_rgba(34,211,238,0.55)]",
+          badge: "from-cyan-400 to-blue-500",
+        }
       : accent === "red"
-        ? { ring: "border-red-400/60", bg: "bg-red-500/10", glow: "shadow-[0_0_35px_-14px_rgba(239,68,68,0.45)]", badge: "from-red-500 to-rose-500" }
-        : { ring: "border-blue-400/60", bg: "bg-blue-500/10", glow: "shadow-[0_0_35px_-14px_rgba(59,130,246,0.45)]", badge: "from-blue-500 to-cyan-500" };
+        ? {
+            ring: "border-red-400/60",
+            bg: "bg-red-500/10",
+            glow: "shadow-[0_0_35px_-14px_rgba(239,68,68,0.45)]",
+            badge: "from-red-500 to-rose-500",
+          }
+        : {
+            ring: "border-blue-400/60",
+            bg: "bg-blue-500/10",
+            glow: "shadow-[0_0_35px_-14px_rgba(59,130,246,0.45)]",
+            badge: "from-blue-500 to-cyan-500",
+          };
 
   return (
     <button
@@ -359,7 +375,9 @@ function PlanCard({ selected, onClick, badge, title, subtitle, rightTop, rightMa
       ].join(" ")}
     >
       {selected && badge && (
-        <div className={`absolute -top-3 right-4 bg-gradient-to-r ${accentStyles.badge} text-white text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-wide shadow-lg`}>
+        <div
+          className={`absolute -top-3 right-4 bg-gradient-to-r ${accentStyles.badge} text-white text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-wide shadow-lg`}
+        >
           {badge}
         </div>
       )}
@@ -370,7 +388,11 @@ function PlanCard({ selected, onClick, badge, title, subtitle, rightTop, rightMa
           <p className="text-xs text-slate-300/90 mt-0.5">{subtitle}</p>
         </div>
         <div className="text-right whitespace-nowrap">
-          {rightTop ? <span className="text-xs text-slate-400 line-through block">{rightTop}</span> : <span className="block h-[16px]" />}
+          {rightTop ? (
+            <span className="text-xs text-slate-400 line-through block">{rightTop}</span>
+          ) : (
+            <span className="block h-[16px]" />
+          )}
           <span className="text-xl font-black text-white">{rightMain}</span>
         </div>
       </div>
@@ -378,15 +400,39 @@ function PlanCard({ selected, onClick, badge, title, subtitle, rightTop, rightMa
   );
 }
 
-function CompareRow({ label }: { label: string }) {
+function CompareRow({ label, highlight = false }: { label: string; highlight?: boolean }) {
   return (
-    <div className="flex items-center gap-3 rounded-xl bg-white/5 border border-white/10 px-4 py-3">
-      <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-emerald-500/15 border border-emerald-400/25">
-        <svg className="w-3.5 h-3.5 text-emerald-300" fill="currentColor" viewBox="0 0 20 20">
-          <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+    <div
+      className={[
+        "flex items-center gap-3 rounded-xl border px-4 py-3",
+        highlight
+          ? "bg-yellow-400/10 border-yellow-400/25"
+          : "bg-white/5 border-white/10",
+      ].join(" ")}
+    >
+      <span
+        className={[
+          "inline-flex items-center justify-center w-6 h-6 rounded-full border",
+          highlight
+            ? "bg-yellow-400/15 border-yellow-400/25"
+            : "bg-emerald-500/15 border-emerald-400/25",
+        ].join(" ")}
+      >
+        <svg
+          className={["w-3.5 h-3.5", highlight ? "text-yellow-300" : "text-emerald-300"].join(" ")}
+          fill="currentColor"
+          viewBox="0 0 20 20"
+        >
+          <path
+            fillRule="evenodd"
+            d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+            clipRule="evenodd"
+          />
         </svg>
       </span>
-      <span className="text-sm text-slate-200">{label}</span>
+      <span className={["text-sm", highlight ? "text-yellow-200 font-bold" : "text-slate-200"].join(" ")}>
+        {label}
+      </span>
     </div>
   );
 }
@@ -409,13 +455,21 @@ function FAQItem({ q, a }: { q: string; a: string }) {
   const [open, setOpen] = useState(false);
   return (
     <div className="rounded-2xl bg-white/5 border border-white/10 overflow-hidden">
-      <button onClick={() => setOpen((v) => !v)} className="w-full flex items-center justify-between gap-3 px-4 py-3 text-left">
+      <button
+        onClick={() => setOpen((v) => !v)}
+        className="w-full flex items-center justify-between gap-3 px-4 py-3 text-left"
+      >
         <span className="text-sm font-extrabold text-white">{q}</span>
         <span className="text-slate-300">{open ? "−" : "+"}</span>
       </button>
       <AnimatePresence initial={false}>
         {open && (
-          <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={{ duration: 0.18 }}>
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: "auto", opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.18 }}
+          >
             <div className="px-4 pb-4 text-sm text-slate-300 leading-relaxed">{a}</div>
           </motion.div>
         )}
@@ -445,7 +499,37 @@ function Stars() {
   );
 }
 
-function ShieldIcon() { return <svg className="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor"><path d="M10 2l7 4v6c0 5-3 7-7 8-4-1-7-3-7-8V6l7-4z" /></svg>; }
-function BoltIcon() { return <svg className="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor"><path d="M11 1L3 11h6l-1 8 9-12h-6l0-6z" /></svg>; }
-function CheckIcon() { return <svg className="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" /></svg>; }
-function PayIcon() { return <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor"><path d="M21 7H3a2 2 0 00-2 2v6a2 2 0 002 2h18a2 2 0 002-2V9a2 2 0 00-2-2zm0 8H3V9h18v6z" /><path d="M6 13h5v2H6z" /></svg>; }
+/* Icons */
+function ShieldIcon() {
+  return (
+    <svg className="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor">
+      <path d="M10 2l7 4v6c0 5-3 7-7 8-4-1-7-3-7-8V6l7-4z" />
+    </svg>
+  );
+}
+function BoltIcon() {
+  return (
+    <svg className="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor">
+      <path d="M11 1L3 11h6l-1 8 9-12h-6l0-6z" />
+    </svg>
+  );
+}
+function CheckIcon() {
+  return (
+    <svg className="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor">
+      <path
+        fillRule="evenodd"
+        d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+        clipRule="evenodd"
+      />
+    </svg>
+  );
+}
+function PayIcon() {
+  return (
+    <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor">
+      <path d="M21 7H3a2 2 0 00-2 2v6a2 2 0 002 2h18a2 2 0 002-2V9a2 2 0 00-2-2zm0 8H3V9h18v6z" />
+      <path d="M6 13h5v2H6z" />
+    </svg>
+  );
+}
