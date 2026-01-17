@@ -274,6 +274,43 @@ export default function DashboardPage() {
 
   const isP = level === "Paramedic";
 
+  // ✅ STEP 3/4: Fire conversion ONLY when dashboard has ?plan=..., then remove plan from URL
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const url = new URL(window.location.href);
+    const plan = (url.searchParams.get("plan") || "").toLowerCase();
+
+    // Only count real post-payment redirects
+    const allowed = plan === "monthly" || plan === "annual" || plan === "lifetime";
+    if (!allowed) return;
+
+    // Your exact Google Ads event snippet (simple: value + currency)
+    const w = window as any;
+    w.dataLayer = w.dataLayer || [];
+    const gtag =
+      typeof w.gtag === "function"
+        ? w.gtag
+        : function () {
+            w.dataLayer.push(arguments);
+          };
+
+    try {
+      gtag("event", "conversion", {
+        send_to: "AW-17883612588/eEaJCJm9oOcbEKyLyc9C",
+        value: 1.0,
+        currency: "USD",
+        transaction_id: "",
+      });
+    } catch {
+      // even if something fails, we still want to clean the URL to avoid repeat firing
+    }
+
+    // ✅ IMPORTANT: prevent double-counting on refresh
+    url.searchParams.delete("plan");
+    window.history.replaceState({}, "", url.pathname + url.search + url.hash);
+  }, []);
+
   const theme = useMemo(() => {
     return {
       bg: isP ? "bg-[#0B1022]" : "bg-[#0F172A]",
@@ -419,7 +456,7 @@ export default function DashboardPage() {
       }
     }
 
-    // Merge last-exam-result perCategory (THIS IS WHERE YOUR BUILD FAILED BEFORE)
+    // Merge last-exam-result perCategory
     const lastExam = safeJSONNullable<ExamResult>(localStorage.getItem("last-exam-result"));
     if (lastExam && lastExam.perCategory && typeof lastExam.perCategory === "object") {
       const at = Number(lastExam.at) || Date.now();
@@ -760,7 +797,11 @@ export default function DashboardPage() {
           <div className="flex items-center justify-between">
             <h3 className="text-xs font-black text-slate-300 uppercase tracking-widest">Performance</h3>
             <span className={`text-[11px] font-mono ${theme.accent}`}>
-              {Object.keys(perf).length > 0 ? "from drills + simulator" : domainBreakdown.length > 0 ? "from diagnostic" : "—"}
+              {Object.keys(perf).length > 0
+                ? "from drills + simulator"
+                : domainBreakdown.length > 0
+                ? "from diagnostic"
+                : "—"}
             </span>
           </div>
 
