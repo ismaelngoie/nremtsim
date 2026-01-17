@@ -23,23 +23,27 @@ const icons: Record<string, string> = {
   "Medical": "💊",
 
   // New Categories
-  "Airway & Ventilation": "😷",         // Mask / BVM
+  "Airway/Ventilation": "😷",         // Mask / BVM
   "Cardiology & Resuscitation": "⚡",   // Defibrillation
   "ECG & Arrhythmias": "📉",            // Rhythm Strip / Graph
   "ECG/Resuscitation": "💓",            // Beating Heart / ROSC
-  "Medical Critical care": "🚨",        // Critical Alert
-  "Medical Emergencies (ALS)": "💉",    // IV / ALS Skills
+  "Medical Critical Care": "🚨",        // Critical Alert
+  "Medical Emergencies (ALS)": "🏥",    // IV / ALS Skills
   "Pharmacology": "🧪",                 // Vials / Meds (Distinct from pill)
   "Trauma & Critical Care": "🩹",       // Bandage / Wound Care
   "Behavioral & Special Populations": "🌀", // Mental Health / Spiral
-  "EMS Operations & Documentations": "📋", // Clipboard / PCR
+  "EMS Operations & Documentation": "📋", // Clipboard / PCR
   "Geriatrics & Special Populations": "👴", // Elderly
   "Medical Emergencies": "🤒",          // General Sickness
   "OB/GYN & Neonatal": "🤰",            // Pregnancy
   "Pediatrics": "🧸",                   // Teddy Bear
   "Pediatrics & OB": "🍼",              // Bottle / Newborn
   "Respiratory & Cardiac": "🫀",        // Anatomical Heart
-  "Trauma & Bleeding Control": "🩸",    // Blood Drop
+  "Trauma & Bleeding": "🩸",    // Blood Drop
+  "Pharmacology/Critical Care": "💉",
+  "Airway & Respiratory": "🌬️",
+  "Cardiac/Neuro/Endocrine": "⚕️",
+"EMS Ops/Ethics/Documentation": "⚖️",
 };
 
 type Level = "EMT" | "Paramedic";
