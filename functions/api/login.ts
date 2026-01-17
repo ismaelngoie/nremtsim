@@ -1,11 +1,5 @@
 // functions/api/login.ts
 // Cloudflare Pages Function: POST /api/login
-// Checks Stripe for:
-//  - ACTIVE subscription (monthly/annual)  OR
-//  - PAID one-time checkout session (lifetime)
-//
-// Env needed in Cloudflare Pages:
-//  - STRIPE_SECRET_KEY = sk_test_... (or sk_live_...)
 
 type StripeList<T> = { object: "list"; data: T[]; has_more: boolean };
 
@@ -22,14 +16,11 @@ async function stripeGET<T>(path: string, stripeKey: string): Promise<T> {
   const url = `https://api.stripe.com${path}`;
   const res = await fetch(url, {
     method: "GET",
-    headers: {
-      Authorization: `Bearer ${stripeKey}`,
-    },
+    headers: { Authorization: `Bearer ${stripeKey}` },
   });
 
-  const json = await res.json();
+  const json: any = await res.json();
 
-  // Stripe errors look like: { error: { message: "..." } }
   if (!res.ok) {
     const msg = json?.error?.message || `Stripe error (${res.status})`;
     throw new Error(msg);
@@ -39,8 +30,6 @@ async function stripeGET<T>(path: string, stripeKey: string): Promise<T> {
 }
 
 function isActiveSubStatus(status: string) {
-  // Keep it simple. If you want to be strict: only "active" + "trialing"
-  // If you want to be generous: include "past_due" too.
   return status === "active" || status === "trialing" || status === "past_due";
 }
 
@@ -54,21 +43,20 @@ async function hasActiveSubscription(customerId: string, stripeKey: string) {
 }
 
 async function hasPaidLifetimeSession(customerId: string, stripeKey: string) {
-  // We treat ANY paid one-time (mode=payment) checkout session as lifetime.
-  // This works well if your only one-time product is Lifetime Access.
-  // If you later add other one-time products, we can filter by PRICE_ID.
+  // Any paid one-time checkout session counts as "lifetime"
   let startingAfter: string | null = null;
 
   for (let page = 0; page < 3; page++) {
-    const qs =
-      `/v1/checkout/sessions?customer=${encodeURIComponent(customerId)}&limit=25` +
-      (startingAfter ? `&starting_after=${encodeURIComponent(startingAfter)}` : "");
+    const base: string = `/v1/checkout/sessions?customer=${encodeURIComponent(customerId)}&limit=25`;
+    const qs: string = startingAfter
+      ? `${base}&starting_after=${encodeURIComponent(startingAfter)}`
+      : base;
 
     const sessions = await stripeGET<StripeList<StripeCheckoutSession>>(qs, stripeKey);
 
-    const found = sessions.data?.some(
-      (s) => s && s.mode === "payment" && s.payment_status === "paid" && s.status === "complete"
-    );
+    const found =
+      Array.isArray(sessions.data) &&
+      sessions.data.some((s) => s.mode === "payment" && s.payment_status === "paid" && s.status === "complete");
 
     if (found) return true;
 
@@ -79,9 +67,9 @@ async function hasPaidLifetimeSession(customerId: string, stripeKey: string) {
   return false;
 }
 
-export async function onRequestPost({ request, env }: { request: Request; env: any }) {
+export async function onRequestPost({ request, env }: { request: Request; env: Record<string, string> }) {
   try {
-    const stripeKey = env.STRIPE_SECRET_KEY as string | undefined;
+    const stripeKey = env.STRIPE_SECRET_KEY;
     if (!stripeKey) {
       return new Response(JSON.stringify({ ok: false, error: "Missing STRIPE_SECRET_KEY" }), {
         status: 500,
@@ -90,9 +78,7 @@ export async function onRequestPost({ request, env }: { request: Request; env: a
     }
 
     const body = (await request.json().catch(() => null)) as { email?: string } | null;
-    const email = String(body?.email || "")
-      .trim()
-      .toLowerCase();
+    const email = String(body?.email || "").trim().toLowerCase();
 
     if (!email || !email.includes("@")) {
       return new Response(JSON.stringify({ ok: false, error: "Email required" }), {
@@ -114,7 +100,7 @@ export async function onRequestPost({ request, env }: { request: Request; env: a
       });
     }
 
-    // 2) Check active subscription
+    // 2) Subscription check
     const subOk = await hasActiveSubscription(customer.id, stripeKey);
     if (subOk) {
       return new Response(JSON.stringify({ ok: true, access: "subscription" }), {
@@ -122,7 +108,7 @@ export async function onRequestPost({ request, env }: { request: Request; env: a
       });
     }
 
-    // 3) Check lifetime (paid one-time session)
+    // 3) Lifetime check
     const lifeOk = await hasPaidLifetimeSession(customer.id, stripeKey);
     if (lifeOk) {
       return new Response(JSON.stringify({ ok: true, access: "lifetime" }), {
