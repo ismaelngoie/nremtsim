@@ -16,7 +16,6 @@ type PricingTier = {
 };
 
 // ✅ PASTE YOUR STRIPE PAYMENT LINKS HERE
-// (Stripe Dashboard -> Payment Links -> copy the URL)
 const STRIPE_LINKS: Record<PlanKey, string> = {
   annual: "https://buy.stripe.com/14AeVe4nMey3dor0c16J202",
   monthly: "https://buy.stripe.com/aFadRag6ugGb5VZ7Et6J201",
@@ -89,7 +88,6 @@ function PaywallContent() {
   const [passProb, setPassProb] = useState<number | null>(null);
   const [ciLow, setCiLow] = useState<number | null>(null);
   const [ciHigh, setCiHigh] = useState<number | null>(null);
-  const [domainBreakdown, setDomainBreakdown] = useState<DomainRow[] | null>(null);
   const [missed, setMissed] = useState<DiagnosticAnswer | null>(null);
 
   useEffect(() => {
@@ -116,19 +114,6 @@ function PaywallContent() {
     if (Number.isFinite(pp) && pp >= 0 && pp <= 100) setPassProb(Math.round(pp));
     if (Number.isFinite(cl) && cl >= 0 && cl <= 100) setCiLow(Math.round(cl));
     if (Number.isFinite(ch) && ch >= 0 && ch <= 100) setCiHigh(Math.round(ch));
-
-    // Domain breakdown preview
-    try {
-      const raw = localStorage.getItem("domainBreakdown");
-      if (raw) {
-        const parsed = JSON.parse(raw) as DomainRow[];
-        if (Array.isArray(parsed) && parsed.length) {
-          setDomainBreakdown(parsed.slice(0, 6));
-        }
-      }
-    } catch {
-      // ignore
-    }
 
     // Missed question preview
     try {
@@ -186,7 +171,7 @@ function PaywallContent() {
   // ✅ Stripe checkout URL based on chosen plan
   const checkoutHref = useMemo(() => STRIPE_LINKS[selectedPlan], [selectedPlan]);
 
-  // scrolling safe space (your previous fix)
+  // scrolling safe space
   const bottomSafePadding = "pb-[340px]";
 
   async function handleRestore() {
@@ -238,7 +223,7 @@ function PaywallContent() {
 
       {/* CONTENT */}
       <div className={`w-full max-w-sm z-10 pt-5 ${bottomSafePadding}`}>
-        {/* Paid banner (optional). If you set Stripe redirect to /pay?success=true this shows. */}
+        {/* Paid banner */}
         {paid && (
           <div className="mb-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 p-4">
             <div className="text-sm font-black text-emerald-200">✅ Payment Complete</div>
@@ -296,9 +281,7 @@ function PaywallContent() {
                 <div className="text-[11px] text-slate-400 font-semibold">Avg. candidate rating</div>
               </div>
             </div>
-
             <div className="h-9 w-px bg-white/10" />
-
             <div className="leading-tight text-right">
               <div className="text-sm font-extrabold">12,000+</div>
               <div className="text-[11px] text-slate-400 font-semibold">Simulations this month</div>
@@ -346,47 +329,7 @@ function PaywallContent() {
           </div>
         </motion.div>
 
-        {/* Domain breakdown teaser */}
-        {domainBreakdown && domainBreakdown.length > 0 && (
-          <div className="mb-6 rounded-2xl bg-slate-900/45 border border-white/10 p-5 relative overflow-hidden">
-            <div className="flex items-center justify-between">
-              <h3 className="text-xs font-black text-slate-300 uppercase tracking-widest">Domain Breakdown</h3>
-              <span className={`text-[11px] font-mono ${theme.accentText}`}>generated from your answers</span>
-            </div>
-
-            <div className="mt-4 space-y-2 relative">
-              <div className="absolute inset-0 bg-black/35 backdrop-blur-[2px]" />
-              <div className="absolute inset-0 flex items-center justify-center">
-                <div className="px-4 py-2 rounded-full bg-white/10 border border-white/15 text-[11px] font-black tracking-widest uppercase">
-                  🔒 Unlock full breakdown
-                </div>
-              </div>
-
-              <div className="relative opacity-40">
-                {domainBreakdown.slice(0, 4).map((d) => (
-                  <div key={d.category} className="rounded-xl bg-white/5 border border-white/10 p-3">
-                    <div className="flex items-center justify-between">
-                      <div className="text-sm font-extrabold text-slate-100">{d.category}</div>
-                      <div className="text-sm font-black text-white">{d.accuracy}%</div>
-                    </div>
-                    <div className="mt-2 w-full bg-white/10 h-2 rounded-full overflow-hidden">
-                      <div className={`h-full ${theme.bar}`} style={{ width: `${d.accuracy}%` }} />
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <div className="mt-4 rounded-xl bg-white/5 border border-white/10 p-4">
-              <div className="text-sm font-extrabold">What the plan does</div>
-              <div className="mt-1 text-sm text-slate-300 leading-relaxed">
-                It attacks your lowest domains first: drills → full sims → rationales → retest.
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Missed question teaser */}
+        {/* Missed question teaser (THE HOOK) */}
         {missed && (
           <div className="mb-6 rounded-2xl bg-slate-900/45 border border-white/10 p-5 relative overflow-hidden">
             <div className="flex items-center justify-between">
@@ -395,11 +338,14 @@ function PaywallContent() {
             </div>
 
             <div className="mt-4 relative">
-              <div className="absolute inset-0 bg-black/35 backdrop-blur-[2px]" />
-              <div className="absolute inset-0 flex items-center justify-center">
-                <div className="px-4 py-2 rounded-full bg-white/10 border border-white/15 text-[11px] font-black tracking-widest uppercase">
-                  🔒 Unlock to reveal the rationale
-                </div>
+              {/* ✅ CLICKABLE OVERLAY BUTTON */}
+              <div className="absolute inset-0 bg-black/35 backdrop-blur-[2px] z-10 flex items-center justify-center">
+                 <a 
+                   href={checkoutHref}
+                   className="px-5 py-3 rounded-full bg-white/10 border border-white/15 text-xs font-black tracking-widest uppercase hover:bg-white/20 transition-all shadow-lg backdrop-blur-md flex items-center gap-2"
+                 >
+                   🔒 Unlock Rationale • {fmt(PRICING[selectedPlan].price)}
+                 </a>
               </div>
 
               <div className="relative opacity-40">
