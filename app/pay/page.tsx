@@ -344,7 +344,7 @@ function PaywallContent() {
                    href={checkoutHref}
                    className="px-5 py-3 rounded-full bg-white/10 border border-white/15 text-xs font-black tracking-widest uppercase hover:bg-white/20 transition-all shadow-lg backdrop-blur-md flex items-center gap-2"
                  >
-                   🔒 Unlock Rationale • {fmt(PRICING[selectedPlan].price)}
+                   🔓 Unlock Answer & 6,000+ Practice Tests • {fmt(PRICING[selectedPlan].price)}
                  </a>
               </div>
 
