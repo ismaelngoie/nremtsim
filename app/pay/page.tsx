@@ -341,11 +341,11 @@ function PaywallContent() {
               {/* ✅ CLICKABLE OVERLAY BUTTON */}
               <div className="absolute inset-0 bg-black/35 backdrop-blur-[2px] z-10 flex items-center justify-center">
                  <a 
-                   href={checkoutHref}
-                   className="px-5 py-3 rounded-full bg-white/10 border border-white/15 text-xs font-black tracking-widest uppercase hover:bg-white/20 transition-all shadow-lg backdrop-blur-md flex items-center gap-2"
-                 >
-                   🔓 Unlock Answer & 6,000+ Practice Tests • {fmt(PRICING[selectedPlan].price)}
-                 </a>
+  href={checkoutHref}
+  className="px-5 py-3 rounded-full bg-white/10 border border-white/15 text-xs font-black tracking-widest uppercase hover:bg-white/20 transition-all shadow-lg backdrop-blur-md flex items-center gap-2 whitespace-nowrap"
+>
+  🔓 Unlock Answer & 6,000+ Practice Tests • {fmt(PRICING[selectedPlan].price)}
+</a>
               </div>
 
               <div className="relative opacity-40">
