@@ -11,9 +11,24 @@ export default function Home() {
   const [level, setLevel] = useState<Level>("EMT");
 
   useEffect(() => {
+    // 1. Check if Pro (Paid) -> Dashboard
+    const isPro = localStorage.getItem("pro") === "true";
+    if (isPro) {
+      router.replace("/dashboard");
+      return;
+    }
+
+    // 2. Check if Test Taken -> Paywall (Lockout)
+    const isDone = localStorage.getItem("diagnosticCompletedAt");
+    if (isDone) {
+      router.replace("/pay");
+      return;
+    }
+
+    // 3. Load Level preference
     const saved = localStorage.getItem("userLevel") as Level | null;
     if (saved === "EMT" || saved === "Paramedic") setLevel(saved);
-  }, []);
+  }, [router]);
 
   const accent = useMemo(() => {
     return level === "Paramedic"
