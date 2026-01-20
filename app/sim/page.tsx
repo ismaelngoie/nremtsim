@@ -551,13 +551,6 @@ export default function SimulatorPage() {
               Unlock the fix plan + unlimited full sims + full rationales
             </div>
 
-            <button
-              onClick={retake}
-              className="mt-3 w-full py-3 rounded-xl bg-white/5 border border-white/10 text-sm font-bold text-slate-200 hover:bg-white/10"
-            >
-              Retake Diagnostic (Free)
-            </button>
-
             <div className="mt-4 text-center text-[10px] uppercase tracking-widest text-white/25">
               Instant unlock • Designed to convert pressure into passing
             </div>
