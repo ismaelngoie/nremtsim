@@ -14,7 +14,7 @@ type PricingTier = {
   strike: number | null;
   badge?: string;
   subtitle: string;
-  title: string; // Used for the button text now
+  title: string;
 };
 
 // --- Config ---
@@ -117,7 +117,7 @@ function PaywallContent() {
   const [passProb, setPassProb] = useState<number | null>(null);
   const [ciLow, setCiLow] = useState<number | null>(null);
   const [ciHigh, setCiHigh] = useState<number | null>(null);
-  const [missed, setMissed] = useState<DiagnosticAnswer | null>(null);
+  const [missedList, setMissedList] = useState<DiagnosticAnswer[]>([]);
 
   // Embedded Checkout
   const stripePk = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY || "";
@@ -148,14 +148,14 @@ function PaywallContent() {
     if (Number.isFinite(cl)) setCiLow(Math.round(cl));
     if (Number.isFinite(ch)) setCiHigh(Math.round(ch));
 
-    // Missed question
+    // Missed question (Load all wrong answers)
     try {
       const raw = localStorage.getItem("diagnosticAnswers");
       if (raw) {
         const parsed = JSON.parse(raw) as DiagnosticAnswer[];
         if (Array.isArray(parsed) && parsed.length) {
-          const firstMiss = parsed.find((a) => a && a.isCorrect === false) || null;
-          setMissed(firstMiss);
+          const wrong = parsed.filter((a) => !a.isCorrect).slice(0, 3);
+          setMissedList(wrong);
         }
       }
     } catch {}
@@ -272,6 +272,48 @@ function PaywallContent() {
     }
   }
 
+  // --- MISSED QUESTION CARD ---
+  const MissedCard = ({ item }: { item: DiagnosticAnswer }) => {
+    const correctLetter = String.fromCharCode(65 + item.correctIndex);
+    const userLetter = item.selectedIndex >= 0 ? String.fromCharCode(65 + item.selectedIndex) : "-";
+
+    return (
+      <div className="bg-[#0B1022] border border-white/10 rounded-2xl p-5 mb-4 shadow-xl">
+        <div className="text-[10px] font-black uppercase tracking-widest text-amber-400 mb-2">
+          YOU MISSED THIS • {item.category.toUpperCase()}
+        </div>
+        
+        <div className="text-sm font-bold text-white leading-relaxed mb-4">
+          {item.text}
+        </div>
+
+        <div className="grid grid-cols-2 gap-3 mb-4">
+          <div className="bg-emerald-900/20 border border-emerald-500/20 rounded-xl p-3">
+            <div className="text-[9px] font-black uppercase tracking-widest text-emerald-400 mb-1">CORRECT</div>
+            <div className="text-2xl font-black text-emerald-300">{correctLetter}</div>
+          </div>
+          <div className="bg-red-900/20 border border-red-500/20 rounded-xl p-3">
+            <div className="text-[9px] font-black uppercase tracking-widest text-red-400 mb-1">YOU PICKED</div>
+            <div className="text-2xl font-black text-red-300">{userLetter}</div>
+          </div>
+        </div>
+
+        <button 
+          onClick={startCheckout}
+          className="w-full relative bg-white/5 border border-white/10 rounded-xl py-3 px-4 flex items-center justify-center gap-3 overflow-hidden group hover:bg-white/10 transition-colors"
+        >
+          <div className="relative z-10 flex items-center gap-2">
+            <span className="text-lg">🔒</span>
+            <div className="text-left">
+              <div className="text-[10px] font-black uppercase tracking-widest text-white">SEE FULL ANSWERS + WHY</div>
+              <div className="text-[9px] text-slate-400">Get unlimited NREMT practice tests</div>
+            </div>
+          </div>
+        </button>
+      </div>
+    );
+  };
+
   return (
     <div className={`min-h-screen ${theme.subtleBg} text-white font-sans flex flex-col items-center px-4 md:px-6 relative overflow-y-auto`}>
       {/* Background */}
@@ -379,35 +421,26 @@ function PaywallContent() {
           </div>
         </motion.div>
 
-        {/* Missed Question Hook */}
-        {missed && (
-          <div className="mb-6 rounded-2xl bg-slate-900/45 border border-white/10 p-5 relative overflow-hidden">
-            <div className="flex items-center justify-between">
-              <h3 className="text-xs font-black text-slate-300 uppercase tracking-widest">Missed Question Preview</h3>
-              <span className="text-[11px] font-mono text-slate-400">rationale inside</span>
+        {/* ✅ WHAT YOU MISSED SECTION (Replaces old generic blurred card) */}
+        {missedList.length > 0 && (
+          <div className="mb-8">
+            <div className="flex justify-between items-center mb-4 px-1">
+              <div className="text-xs font-black uppercase tracking-widest text-white">What You Missed</div>
+              <div className="text-[10px] font-mono text-slate-500 uppercase tracking-widest">TAP TO UNLOCK</div>
             </div>
-            <div className="mt-4 relative">
-              <div className="absolute inset-0 bg-black/20 backdrop-blur-[2px] z-10 flex items-center justify-center">
-                <button
-                  onClick={startCheckout}
-                  className="w-full max-w-[90%] px-3 py-3 rounded-full bg-white/10 border border-white/15 text-[10px] md:text-xs font-black tracking-widest uppercase hover:bg-white/20 transition-all shadow-lg backdrop-blur-md flex items-center justify-center gap-2 text-center whitespace-normal leading-tight"
-                >
-                  🔒 Unlock Answer & 6,000+ Practice Tests • {fmt(PRICING[selectedPlan].price)}
-                </button>
-              </div>
-              <div className="relative">
-                <div className="text-sm font-extrabold text-white leading-relaxed">{missed.text}</div>
-                <div className="mt-3 space-y-2">
-                  {missed.options.map((opt, i) => (
-                    <div key={i} className="rounded-xl bg-white/5 border border-white/10 px-3 py-2 text-sm text-slate-200 flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <span className="text-slate-400 font-mono">{String.fromCharCode(65 + i)}.</span>
-                        <span className="font-semibold">{opt}</span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
+            
+            {missedList.map((missed) => (
+              <MissedCard key={missed.id} item={missed} />
+            ))}
+
+            <button 
+              onClick={startCheckout}
+              className="w-full py-4 rounded-xl bg-white text-black font-black text-sm uppercase tracking-widest hover:bg-slate-200 transition-colors flex items-center justify-center gap-2 shadow-[0_0_25px_rgba(255,255,255,0.15)]"
+            >
+              SEE FULL ANSWERS + EXPLANATIONS <span className="text-lg">→</span>
+            </button>
+            <div className="mt-3 text-center text-[9px] font-black uppercase tracking-widest text-slate-500">
+              Unlimited NREMT Practice Tests • All Categories • Works Offline • 12,000+ NREMTs Passed
             </div>
           </div>
         )}
