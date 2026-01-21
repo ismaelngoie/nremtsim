@@ -148,14 +148,21 @@ function PaywallContent() {
     if (Number.isFinite(cl)) setCiLow(Math.round(cl));
     if (Number.isFinite(ch)) setCiHigh(Math.round(ch));
 
-    // Missed question (Load all wrong answers)
+    // Missed question (Load all wrong answers OR fallback to sample)
     try {
       const raw = localStorage.getItem("diagnosticAnswers");
       if (raw) {
         const parsed = JSON.parse(raw) as DiagnosticAnswer[];
         if (Array.isArray(parsed) && parsed.length) {
-          const wrong = parsed.filter((a) => !a.isCorrect).slice(0, 3);
-          setMissedList(wrong);
+          // 1. Try to find wrong answers
+          let list = parsed.filter((a) => !a.isCorrect);
+          
+          // 2. Fallback: If 100% score (no wrong answers), pick the first one as a sample
+          if (list.length === 0) {
+             list = parsed.slice(0, 1);
+          }
+          
+          setMissedList(list.slice(0, 3));
         }
       }
     } catch {}
@@ -276,11 +283,13 @@ function PaywallContent() {
   const MissedCard = ({ item }: { item: DiagnosticAnswer }) => {
     const correctLetter = String.fromCharCode(65 + item.correctIndex);
     const userLetter = item.selectedIndex >= 0 ? String.fromCharCode(65 + item.selectedIndex) : "-";
+    const isCorrect = item.isCorrect;
 
     return (
       <div className="bg-[#0B1022] border border-white/10 rounded-2xl p-5 mb-4 shadow-xl">
-        <div className={`text-[10px] font-black uppercase tracking-widest ${theme.accentText} mb-2`}>
-          YOU MISSED THIS • {item.category.toUpperCase()}
+        {/* Dynamic Header: Changes if they actually got it right */}
+        <div className={`text-[10px] font-black uppercase tracking-widest mb-2 ${isCorrect ? "text-emerald-400" : theme.accentText}`}>
+          {isCorrect ? `ANALYSIS LOCKED • ${item.category.toUpperCase()}` : `YOU MISSED THIS • ${item.category.toUpperCase()}`}
         </div>
         
         <div className="text-sm font-bold text-white leading-relaxed mb-4">
@@ -292,9 +301,10 @@ function PaywallContent() {
             <div className="text-[9px] font-black uppercase tracking-widest text-emerald-400 mb-1">CORRECT</div>
             <div className="text-2xl font-black text-emerald-300">{correctLetter}</div>
           </div>
-          <div className="bg-red-900/20 border border-red-500/20 rounded-xl p-3">
-            <div className="text-[9px] font-black uppercase tracking-widest text-red-400 mb-1">YOU PICKED</div>
-            <div className="text-2xl font-black text-red-300">{userLetter}</div>
+          {/* Dynamic User Box: Green if correct, Red if wrong */}
+          <div className={`${isCorrect ? "bg-emerald-900/20 border-emerald-500/20" : "bg-red-900/20 border-red-500/20"} border rounded-xl p-3`}>
+            <div className={`text-[9px] font-black uppercase tracking-widest ${isCorrect ? "text-emerald-400" : "text-red-400"} mb-1`}>YOU PICKED</div>
+            <div className={`text-2xl font-black ${isCorrect ? "text-emerald-300" : "text-red-300"}`}>{userLetter}</div>
           </div>
         </div>
 
