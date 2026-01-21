@@ -366,7 +366,7 @@ function PaywallContent() {
             <span className="text-[11px] font-mono text-slate-400">T-{daysToExam} days</span>
           </div>
           <h1 className="mt-3 text-3xl font-black tracking-tight leading-[1.05]">
-            Unlock Your <span className={theme.accentText}>Readiness Plan</span>
+            Unlock 4,000+ Practice Tests and Answerrs & <span className={theme.accentText}>Full Simulator</span>
           </h1>
           <p className="mt-2 text-slate-300 text-sm leading-relaxed">
             Your readiness is <span className="font-black text-white">{readiness}%</span>{" "}
