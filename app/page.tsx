@@ -18,7 +18,7 @@ export default function Home() {
       return;
     }
 
-    // 3. Load Level preference
+    // 2. Check Level preference
     const saved = localStorage.getItem("userLevel") as Level | null;
     if (saved === "EMT" || saved === "Paramedic") setLevel(saved);
   }, [router]);
@@ -62,21 +62,20 @@ export default function Home() {
         >
           <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-white/10 bg-white/5 backdrop-blur-sm">
             <span className="text-[11px] font-black tracking-[0.22em] text-slate-200 uppercase">
-              CAT-Style Diagnostic
+              Adaptive Diagnostic
             </span>
             <span className="text-[11px] font-mono text-slate-400">5 questions • ~60 sec</span>
           </div>
 
-          <h1 className="mt-6 text-5xl md:text-7xl font-black tracking-tighter leading-[0.95] text-white">
-            WILL THE <br />
+          <h1 className="mt-6 text-4xl md:text-6xl font-black tracking-tighter leading-[1.0] text-white">
+            NREMT Practice Test 2026: <br />
             <span className={`text-transparent bg-clip-text bg-gradient-to-r ${accent.grad}`}>
-              COMPUTER STOP?
+              4,000+ Real Exam Questions
             </span>
           </h1>
 
           <p className="mt-4 text-slate-300 text-sm md:text-base max-w-md leading-relaxed">
-            Get a readiness score + your weakest domain in under a minute.
-            No signup. Just run the sim.
+            Join 12,000+ students who passed. Includes full simulator, detailed answers, and a 100% Pass Guarantee.
           </p>
         </motion.div>
 
@@ -94,18 +93,18 @@ export default function Home() {
             <div className="flex items-center justify-between gap-3">
               <div className="text-left">
                 <div className="text-xs font-black uppercase tracking-widest text-slate-300">
-                  Select Level
+                  Select Exam Level
                 </div>
                 <div className="text-[11px] text-slate-400 font-semibold mt-1">
-                  Calibrates your diagnostic + study plan
+                  Calibrates difficulty & questions
                 </div>
               </div>
 
-              {/* Optional mini social proof (replace with real numbers if you have them) */}
+              {/* Social Proof */}
               <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-full border border-white/10 bg-white/5">
                 <span className="text-yellow-300 text-sm">★★★★★</span>
                 <span className="text-[11px] text-slate-300 font-black">4.8</span>
-                <span className="text-[11px] text-slate-400 font-semibold">avg rating</span>
+                <span className="text-[11px] text-slate-400 font-semibold">/ 5.0</span>
               </div>
             </div>
 
@@ -145,9 +144,9 @@ export default function Home() {
 
             {/* Value bullets (tight, not cluttered) */}
             <div className="mt-4 grid gap-2">
-              <MiniRow text="Instant readiness score + domain weakness" />
-              <MiniRow text="Rationales + review mode inside the sim" />
-              <MiniRow text="No signup required to start" />
+              <MiniRow text="Same format as the real test" />
+              <MiniRow text="Unlimited practice tests" />
+              <MiniRow text="Pass Guarantee" />
             </div>
 
             <motion.button
@@ -155,22 +154,21 @@ export default function Home() {
               whileTap={{ scale: 0.99 }}
               onClick={start}
               className={`mt-5 w-full py-5 rounded-xl font-black text-lg text-white border border-white/10
-                          bg-gradient-to-r ${accent.btn} shadow-lg hover:shadow-cyan-500/20 transition-all`}
+                          bg-gradient-to-r ${accent.btn} shadow-lg hover:shadow-cyan-500/20 transition-all uppercase tracking-widest`}
             >
-              START FREE DIAGNOSTIC →
+              Start Diagnostic Now →
             </motion.button>
 
             {/* Trust chips */}
             <div className="mt-4 flex flex-wrap justify-center gap-2 opacity-90">
-              <Chip className={accent.chip} text={`${level} calibrated`} />
-              <Chip className="text-slate-300 border-white/10 bg-white/5" text="60 seconds" />
-              <Chip className="text-slate-300 border-white/10 bg-white/5" text="Mobile friendly" />
-              <Chip className="text-slate-300 border-white/10 bg-white/5" text="No signup" />
+              <Chip className={accent.chip} text={`${level} Questions`} />
+              <Chip className="text-slate-300 border-white/10 bg-white/5" text="2026 Guidelines" />
+              <Chip className="text-slate-300 border-white/10 bg-white/5" text="Works on Phone" />
             </div>
           </div>
 
           <p className="mt-6 text-center text-white/25 text-[10px] uppercase tracking-widest">
-            Fast • Focused • Built for exam pressure
+            Trusted by 10,000+ Medics • Fast & Secure
           </p>
         </motion.div>
       </div>
