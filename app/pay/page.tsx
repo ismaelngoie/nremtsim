@@ -118,6 +118,7 @@ function PaywallContent() {
   const [ciLow, setCiLow] = useState<number | null>(null);
   const [ciHigh, setCiHigh] = useState<number | null>(null);
   const [missedList, setMissedList] = useState<DiagnosticAnswer[]>([]);
+  const [isPerfectScore, setIsPerfectScore] = useState(false);
 
   // Embedded Checkout
   const stripePk = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY || "";
@@ -157,9 +158,12 @@ function PaywallContent() {
           // 1. Try to find wrong answers
           let list = parsed.filter((a) => !a.isCorrect);
           
-          // 2. Fallback: If 100% score (no wrong answers), pick the first one as a sample
+          // 2. Fallback: If 100% score (no wrong answers), pick first 3 as samples
           if (list.length === 0) {
-             list = parsed.slice(0, 1);
+             setIsPerfectScore(true);
+             list = parsed.slice(0, 3);
+          } else {
+             setIsPerfectScore(false);
           }
           
           setMissedList(list.slice(0, 3));
@@ -287,7 +291,7 @@ function PaywallContent() {
 
     return (
       <div className="bg-[#0B1022] border border-white/10 rounded-2xl p-5 mb-4 shadow-xl">
-        {/* Dynamic Header: Changes if they actually got it right */}
+        {/* Dynamic Header: "ANALYSIS LOCKED" if perfect, "YOU MISSED THIS" if wrong */}
         <div className={`text-[10px] font-black uppercase tracking-widest mb-2 ${isCorrect ? "text-emerald-400" : theme.accentText}`}>
           {isCorrect ? `ANALYSIS LOCKED • ${item.category.toUpperCase()}` : `YOU MISSED THIS • ${item.category.toUpperCase()}`}
         </div>
@@ -442,11 +446,13 @@ function PaywallContent() {
           </div>
         </motion.div>
 
-        {/* ✅ WHAT YOU MISSED SECTION */}
+        {/* ✅ WHAT YOU MISSED SECTION (FIXED: Visible for 100% scores too) */}
         {missedList.length > 0 && (
           <div className="mb-8">
             <div className="flex justify-between items-center mb-4 px-1">
-              <div className="text-xs font-black uppercase tracking-widest text-white">What You Missed</div>
+              <div className="text-xs font-black uppercase tracking-widest text-white">
+                {isPerfectScore ? "FULL EXAM ANALYSIS" : "What You Missed"}
+              </div>
               <div className="text-[10px] font-mono text-slate-500 uppercase tracking-widest">TAP TO UNLOCK</div>
             </div>
             
