@@ -68,7 +68,7 @@ export default function Home() {
           </div>
 
           <h1 className="mt-6 text-4xl md:text-6xl font-black tracking-tighter leading-[1.0] text-white">
-            NREMT Practice Test 2026: <br />
+            NREMT PRACTICE TEST 2026: <br />
             <span className={`text-transparent bg-clip-text bg-gradient-to-r ${accent.grad}`}>
               4,000+ Real Exam Questions
             </span>
