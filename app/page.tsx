@@ -162,8 +162,7 @@ export default function Home() {
             {/* Trust chips */}
             <div className="mt-4 flex flex-wrap justify-center gap-2 opacity-90">
               <Chip className={accent.chip} text={`${level} Questions`} />
-              <Chip className="text-slate-300 border-white/10 bg-white/5" text="2026 Guidelines" />
-              <Chip className="text-slate-300 border-white/10 bg-white/5" text="Works on Phone" />
+              <Chip className="text-slate-300 border-white/10 bg-white/5" text="Trusted by 12,000+" />
             </div>
           </div>
 
