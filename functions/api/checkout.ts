@@ -7,9 +7,9 @@ type Env = {
 const STRIPE_API = "https://api.stripe.com";
 
 // ✅ Real Price IDs
-const PRICE_LIFETIME = "price_1SqVGXJ45BjaRdEF2dyiGFB1";
-const PRICE_MONTHLY = "price_1SqVJ5J45BjaRdEF4zHclwhS";
-const PRICE_ANNUAL = "price_1SqVKzJ45BjaRdEF0U7p8Eqy";
+const PRICE_LIFETIME = "price_1SsfTRJ45BjaRdEFbyo2A1sJ";
+const PRICE_MONTHLY = "price_1SsfRQJ45BjaRdEFiOgbCfLu";
+const PRICE_ANNUAL = "";
 
 function json(body: any, status = 200) {
   return new Response(JSON.stringify(body), {
