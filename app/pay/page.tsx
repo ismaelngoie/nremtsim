@@ -6,7 +6,7 @@ import type { ReactNode } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
 // --- Types ---
-type PlanKey = "monthly" | "annual" | "lifetime";
+type PlanKey = "monthly" | "lifetime";
 
 type PricingTier = {
   price: number;
@@ -19,25 +19,18 @@ type PricingTier = {
 
 // --- Config ---
 const PRICING: Record<PlanKey, PricingTier> = {
-  annual: {
-    price: 119,
-    cadence: "/yr",
-    strike: 228,
-    badge: "Best Value",
-    subtitle: "Cheapest per month + keeps your progress",
-    title: "Start Annual Access",
-  },
   monthly: {
-    price: 19,
+    price: 6.95,
     cadence: "/mo",
-    strike: null,
+    strike: 19.95,
     subtitle: "Cancel anytime",
     title: "Start Monthly Access",
   },
   lifetime: {
-    price: 249,
+    price: 24.95,
     cadence: " once",
-    strike: 399,
+    strike: 69.00,
+    badge: "Best Value",
     subtitle: "One-time payment. Own it forever",
     title: "Get Lifetime Access",
   },
@@ -201,11 +194,6 @@ function PaywallContent() {
     const validDate = new Date();
     validDate.setFullYear(validDate.getFullYear() + 2);
     return validDate.toLocaleDateString("en-US", { month: "2-digit", year: "numeric" });
-  }, []);
-
-  const annualMonthlyEquivalent = useMemo(() => {
-    const perMonth = PRICING.annual.price / 12;
-    return Math.round(perMonth * 100) / 100;
   }, []);
 
   const bottomSafePadding = "pb-[340px]";
@@ -491,22 +479,11 @@ function PaywallContent() {
         {/* Plans */}
         <div className="mb-5 space-y-3">
           <PlanCard
-            selected={selectedPlan === "annual"}
-            onClick={() => setSelectedPlan("annual")}
-            badge={PRICING.annual.badge}
-            title={PRICING.annual.title}
-            subtitle={`Only ${fmt(annualMonthlyEquivalent)} /mo billed yearly`}
-            rightTop={PRICING.annual.strike ? fmt(PRICING.annual.strike) : null}
-            rightMain={`${fmt(PRICING.annual.price)}${PRICING.annual.cadence}`}
-            accent={isP ? "rose" : "cyan"}
-            badgeGrad={theme.badgeGrad}
-          />
-          <PlanCard
             selected={selectedPlan === "monthly"}
             onClick={() => setSelectedPlan("monthly")}
             title={PRICING.monthly.title}
             subtitle="Cancel anytime."
-            rightTop={null}
+            rightTop={PRICING.monthly.strike ? fmt(PRICING.monthly.strike) : null}
             rightMain={`${fmt(PRICING.monthly.price)}${PRICING.monthly.cadence}`}
             accent={isP ? "rose" : "blue"}
             badgeGrad={theme.badgeGrad}
@@ -518,17 +495,10 @@ function PaywallContent() {
             subtitle="One-time payment. Own it forever."
             rightTop={PRICING.lifetime.strike ? fmt(PRICING.lifetime.strike) : null}
             rightMain={`${fmt(PRICING.lifetime.price)}${PRICING.lifetime.cadence}`}
+            badge={PRICING.lifetime.badge}
             accent="red"
             badgeGrad={theme.badgeGrad}
           />
-        </div>
-
-        {/* Nudge */}
-        <div className="mb-6 rounded-xl bg-white/5 border border-white/10 p-4">
-          <div className="text-sm font-extrabold text-white">Why Annual wins</div>
-          <div className="mt-1 text-sm text-slate-300 leading-relaxed">
-            Most candidates study for weeks. Annual keeps your progress, costs less than 7 months of monthly, and removes “time pressure”.
-          </div>
         </div>
 
         {/* Testimonials */}
@@ -575,7 +545,6 @@ function PaywallContent() {
                   </span>
                 </div>
                 <div className="text-xs text-slate-400 font-mono">
-                  {selectedPlan === "annual" && <>Save {fmt((PRICING.annual.strike ?? 0) - PRICING.annual.price)}</>}
                   {selectedPlan === "monthly" && <>Cancel anytime</>}
                   {selectedPlan === "lifetime" && <>Pay once</>}
                 </div>
