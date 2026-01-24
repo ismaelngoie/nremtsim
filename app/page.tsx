@@ -46,7 +46,7 @@ export default function Home() {
 
   return (
     // LAYOUT FIX: 'pt-12' moves content up so it's not dead-center
-    <main className="min-h-screen bg-[#0F172A] overflow-hidden relative px-4 pt-12 md:pt-20 flex flex-col items-center">
+    <main className="min-h-screen bg-[#0F172A] overflow-hidden relative px-4 pt-6 md:pt-12 flex flex-col items-center">
       {/* Background */}
       <div className="absolute inset-0 pointer-events-none">
         <div className="absolute -top-24 left-1/2 -translate-x-1/2 w-[720px] h-[720px] bg-cyan-500/10 blur-[140px] rounded-full" />
