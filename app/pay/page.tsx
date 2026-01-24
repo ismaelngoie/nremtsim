@@ -313,13 +313,6 @@ function PaywallContent() {
           <h1 className="text-3xl md:text-4xl font-black tracking-tight leading-[1.05] mb-2 text-white uppercase">
             Unlock 4,000+ <span className={`text-transparent bg-clip-text bg-gradient-to-r ${theme.accentGrad}`}>Real Exam Questions</span>
           </h1>
-          
-          {/* NEW SCORE WARNING BANNER */}
-          <div className={`mt-3 inline-flex flex-col sm:flex-row items-center gap-2 px-4 py-3 rounded-2xl border ${theme.dangerBg} shadow-lg backdrop-blur-md`}>
-            <div className="text-[11px] font-black uppercase tracking-widest leading-tight text-center sm:text-left">
-              ⚠️ You are {failGap}% away from passing • Target is {PASSING_SCORE}% • {userState}
-            </div>
-          </div>
 
         </motion.div>
         {/* Pulse Badge (UPDATED: Matches User Level Color) */}
