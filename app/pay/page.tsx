@@ -23,8 +23,8 @@ const PRICING: Record<PlanKey, PricingTier> = {
     price: 6.95,
     cadence: "/mo",
     strike: 19.95,
-    subtitle: "$6.95 / month", // UPDATED: Price explicit
-    title: "Unlock Full Access", // UPDATED: Stronger verb
+    subtitle: "$6.95 / month",
+    title: "Unlock Full Access",
   },
   lifetime: {
     price: 24.95,
@@ -100,6 +100,8 @@ function PaywallContent() {
 
   // Personalization
   const [userLevel, setUserLevel] = useState("EMT");
+  const [userState, setUserState] = useState("National");
+  const [readiness, setReadiness] = useState(68);
   const [missedList, setMissedList] = useState<DiagnosticAnswer[]>([]);
   const [isPerfectScore, setIsPerfectScore] = useState(false);
 
@@ -110,26 +112,26 @@ function PaywallContent() {
   const embeddedRef = useRef<any>(null);
 
   useEffect(() => {
-    // Level
+    // Load persisted data
     setUserLevel(localStorage.getItem("userLevel") || "EMT");
+    setUserState(localStorage.getItem("userState") || "National");
+    
+    const savedScore = Number(localStorage.getItem("readinessScore"));
+    if (Number.isFinite(savedScore)) setReadiness(Math.round(savedScore));
 
-    // Missed question (Load all wrong answers OR fallback to sample)
+    // Missed question loader
     try {
       const raw = localStorage.getItem("diagnosticAnswers");
       if (raw) {
         const parsed = JSON.parse(raw) as DiagnosticAnswer[];
         if (Array.isArray(parsed) && parsed.length) {
-          // 1. Try to find wrong answers
           let list = parsed.filter((a) => !a.isCorrect);
-          
-          // 2. Fallback: If 100% score (no wrong answers), pick first 3 as samples
           if (list.length === 0) {
              setIsPerfectScore(true);
              list = parsed.slice(0, 3);
           } else {
              setIsPerfectScore(false);
           }
-          
           setMissedList(list.slice(0, 3));
         }
       }
@@ -137,10 +139,13 @@ function PaywallContent() {
   }, []);
 
   const isP = userLevel === "Paramedic";
+  const PASSING_SCORE = 80;
+  const failGap = Math.max(0, PASSING_SCORE - readiness);
 
   const theme = useMemo(() => {
     return {
       accentText: isP ? "text-rose-300" : "text-cyan-300",
+      accentGrad: isP ? "from-rose-400 to-red-500" : "from-cyan-400 to-blue-500",
       ring: isP ? "border-rose-400/60" : "border-cyan-400/70",
       glow: isP
         ? "shadow-[0_0_35px_-14px_rgba(244,63,94,0.45)]"
@@ -149,13 +154,14 @@ function PaywallContent() {
       chipText: isP ? "text-rose-200" : "text-cyan-200",
       ctaGrad: isP ? "from-rose-600 to-red-500" : "from-blue-600 to-cyan-500",
       subtleBg: isP ? "bg-[#0B1022]" : "bg-[#0F172A]",
-      bar: isP ? "bg-rose-500" : "bg-cyan-400",
-      badgeGrad: isP ? "from-rose-500 to-red-500" : "from-cyan-400 to-blue-500",
+      dangerBg: "bg-red-500/10 border-red-500/30 text-red-400",
+      pulseBg: isP ? "bg-rose-400" : "bg-cyan-400",
+      pulseCore: isP ? "bg-rose-500" : "bg-cyan-500",
       icon: isP ? "⚡️" : "🚑",
     };
   }, [isP]);
 
-  const bottomSafePadding = "pb-[200px]";
+  const bottomSafePadding = "pb-[220px]";
 
   // --- Embedded Checkout Logic ---
   const startCheckout = async () => {
@@ -302,18 +308,28 @@ function PaywallContent() {
         {/* HEADER SECTION (Simplified & Centered) */}
         <motion.div initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} className="mb-8 text-center">
           
-          {/* Pulse Badge */}
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-amber-500/30 bg-amber-500/10 text-amber-400 text-[10px] font-mono tracking-widest uppercase mb-6">
+          {/* Pulse Badge (UPDATED: Matches User Level Color) */}
+          <div className={`inline-flex items-center gap-2 px-3 py-1 rounded-full border ${theme.chipBg} ${theme.chipText} text-[10px] font-mono tracking-widest uppercase mb-4`}>
             <span className="relative flex h-2 w-2">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500"></span>
+              <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${theme.pulseBg}`}></span>
+              <span className={`relative inline-flex rounded-full h-2 w-2 ${theme.pulseCore}`}></span>
             </span>
             Used by 12,000+ Candidates • 2026 Edition
           </div>
 
-          <h1 className="text-3xl md:text-4xl font-black tracking-tight leading-[1.05] mb-2 text-white">
-            Unlock 4,000+ Real Exam Questions and Answers
+          {/* UPDATED TITLE (CAPS + GRADIENT) */}
+          <h1 className="text-3xl md:text-4xl font-black tracking-tight leading-[1.05] mb-2 text-white uppercase">
+            Unlock 4,000+ <span className={`text-transparent bg-clip-text bg-gradient-to-r ${theme.accentGrad}`}>Real Exam Questions</span>
           </h1>
+          
+          {/* NEW SCORE WARNING BANNER */}
+          <div className={`mt-3 inline-flex flex-col sm:flex-row items-center gap-2 px-4 py-3 rounded-2xl border ${theme.dangerBg} shadow-lg backdrop-blur-md`}>
+            <span className="text-lg">⚠️</span>
+            <div className="text-[11px] font-black uppercase tracking-widest leading-tight text-center sm:text-left">
+              You are {failGap}% away from passing • Target is {PASSING_SCORE}% • {userState}
+            </div>
+          </div>
+
         </motion.div>
 
         {/* Social Proof */}
@@ -357,10 +373,11 @@ function PaywallContent() {
           </div>
         )}
 
-        {/* Features */}
+        {/* Features (Renamed Header) */}
         <div className="mb-6 rounded-2xl bg-slate-900/45 border border-white/10 p-5">
           <div className="flex items-center justify-between">
-            <h3 className="text-xs font-black text-slate-300 uppercase tracking-widest">Pro Medical Suite Includes</h3>
+            {/* UPDATED HEADER: More direct */}
+            <h3 className="text-xs font-black text-slate-300 uppercase tracking-widest">What&apos;s Included</h3>
             <span className="text-[11px] font-mono text-slate-400">Instant unlock</span>
           </div>
           <div className="mt-4 space-y-3">
@@ -368,7 +385,8 @@ function PaywallContent() {
             <FeatureRow icon="📚" text="4,000+ questions and answers" />
             <FeatureRow icon="🎯" text="Personalized weakness fix plan (auto-generated)" />
             <FeatureRow icon={isP ? "⚡️" : "🚑"} text="EMT + Paramedic modes (switch anytime)" />
-            <FeatureRow icon="🛡️" text="Pass Guarantee (refund if you complete plan + don’t pass)" highlight />
+            {/* UPDATED: Pass Guarantee is now normal white text */}
+            <FeatureRow icon="🛡️" text="Pass Guarantee (refund if you complete plan + don’t pass)" />
           </div>
         </div>
 
@@ -401,9 +419,9 @@ function PaywallContent() {
         <div className="mb-6 rounded-2xl bg-slate-900/40 border border-white/10 p-5">
           <h3 className="text-xs font-black text-slate-300 uppercase tracking-widest">Recent wins</h3>
           <div className="mt-4 space-y-3">
-            <Testimonial quote="The readiness score told me exactly what to fix. I hammered cardio for a week and passed." meta="EMT Candidate • 9 days ago" />
-            <Testimonial quote="Feels like a real exam session. The pacing and review mode finally made it click." meta="Paramedic Candidate • 2 weeks ago" />
-            <Testimonial quote="I stopped guessing. The rationales were the difference." meta="EMR → EMT • First attempt pass" />
+            <Testimonial quote="I failed the NREMT twice before this. The simulator is the exact same as the real test. Passed in 70 questions." meta="EMT Candidate • 2 days ago" />
+            <Testimonial quote="The rationales are gold. They don't just give the answer, they explain the clinical reasoning. Passed first try." meta="Paramedic Candidate • 1 week ago" />
+            <Testimonial quote="Worth every penny. The 100% Pass Guarantee gave me confidence, but I didn't need to use it." meta="NREMT Pass • Verified" />
           </div>
         </div>
 
@@ -430,9 +448,9 @@ function PaywallContent() {
 
       {/* STICKY BOTTOM CHECKOUT (Simplified) */}
       {!checkoutOpen && (
-        <div className="fixed bottom-0 left-0 right-0 z-20">
+        <div className="fixed bottom-0 left-0 right-0 z-50">
           <div className="mx-auto w-full max-w-sm px-4 pb-4">
-            <div className="rounded-2xl bg-black/35 backdrop-blur-xl border border-white/10 p-3 shadow-[0_-15px_40px_-20px_rgba(0,0,0,0.8)]">
+            <div className="rounded-2xl bg-black/80 backdrop-blur-xl border border-white/10 p-3 shadow-[0_-15px_40px_-20px_rgba(0,0,0,0.8)]">
               {/* Removed the 'Selected:' text row as requested */}
               <motion.button
                 onClick={startCheckout}
@@ -536,11 +554,12 @@ export default function PaywallPage() {
 }
 
 // --- Icons & UI ---
-function FeatureRow({ icon, text, highlight = false }: { icon: string; text: string; highlight?: boolean }) {
+// Removed highlight prop logic to keep everything consistent white/slate
+function FeatureRow({ icon, text }: { icon: string; text: string }) {
   return (
     <div className="flex items-start gap-3">
       <span className="text-lg leading-none mt-0.5">{icon}</span>
-      <span className={`text-sm leading-relaxed ${highlight ? "text-yellow-300 font-black" : "text-slate-200"}`}>
+      <span className="text-sm leading-relaxed text-slate-200">
         {text}
       </span>
     </div>
